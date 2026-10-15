@@ -1,0 +1,20 @@
+[package]
+name = "editor-minmd"
+version = "0.1.0"
+description = "A local Markdown editor in paper and ink"
+authors = ["tingxi8087"]
+license = "MIT"
+edition = "2021"
+
+[lib]
+name = "editor_minmd_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+tempfile = "3"
