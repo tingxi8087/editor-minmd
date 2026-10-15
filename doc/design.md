@@ -84,7 +84,7 @@ Markdown 默认直接编辑排版后的内容。标题、列表、任务、引�
 | 样式与路径 | Less、CSS Modules、`@/*` |
 | 开源许可 | MIT，第三方依赖保持各自许可 |
 
-遵循 `react-loose-conventions` 和 `frontend-design` 的既定方向。需要路由时使用 Hash Router；当前只有单个工作台，没有引入空路由或 HTTP 层。使用 npm 和 `package-lock.json`。
+遵循 `react-loose-conventions` 和 `frontend-design` 的既定方向。需要路由时使用 Hash Router；当前只有一个工作台页面（含多个文档标签），没有引入空路由或 HTTP 层。使用 npm 和 `package-lock.json`。
 
 责任划分：
 

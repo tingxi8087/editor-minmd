@@ -1,3 +1,5 @@
+mod menu;
+mod workspace;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
@@ -27,6 +29,8 @@ struct SaveRequest {
     content: String,
     expected_content: Option<String>,
     save_as: bool,
+    #[serde(default)]
+    protected_paths: Vec<String>,
 }
 
 fn read_document(path: &Path) -> Result<DocumentFile, String> {
@@ -111,6 +115,14 @@ async fn open_document(app: tauri::AppHandle) -> Result<Option<DocumentFile>, St
     .map_err(|e| e.to_string())?
 }
 
+// Do not overwrite a second tab, including one with unsaved in-memory changes.
+fn reject_open_target(path: &Path, protected: &[String]) -> Result<(), String> {
+    if protected.iter().any(|other| Path::new(other) == path) {
+        return Err("目标文件已在其他标签中打开，请切换到该标签或选择其他保存位置".into());
+    }
+    Ok(())
+}
+
 #[tauri::command]
 async fn save_document(
     app: tauri::AppHandle,
@@ -153,6 +165,7 @@ async fn save_document(
             }
             path
         };
+        reject_open_target(&path, &request.protected_paths)?;
         let same_file = request.path.as_deref() == Some(path.to_string_lossy().as_ref());
         let expected = if same_file {
             request.expected_content.clone()
@@ -193,11 +206,18 @@ fn release_document(path: String, files: State<'_, OpenedFiles>) {
 pub fn run() {
     tauri::Builder::default()
         .manage(OpenedFiles::default())
+        .manage(workspace::WorkspaceRoot::default())
         .plugin(tauri_plugin_dialog::init())
+        .menu(menu::build)
+        .on_menu_event(menu::dispatch)
         .invoke_handler(tauri::generate_handler![
             open_document,
             save_document,
-            release_document
+            release_document,
+            workspace::open_directory,
+            workspace::list_directory,
+            workspace::read_workspace_document,
+            workspace::close_directory
         ])
         .run(tauri::generate_context!())
         .expect("无法启动 MinMD");
@@ -228,6 +248,15 @@ mod tests {
         fs::remove_file(&path).unwrap();
         assert!(write_document(&path, "mine", Some("original")).is_err());
         assert!(!path.exists());
+    }
+    #[test]
+    fn refuses_save_as_to_another_open_tab() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("other.md");
+        fs::write(&target, "original").unwrap();
+        assert!(reject_open_target(&target, &[target.to_string_lossy().into_owned()]).is_err());
+        assert_eq!(fs::read_to_string(&target).unwrap(), "original");
+        assert!(reject_open_target(&target, &[]).is_ok());
     }
     #[test]
     fn new_file_and_utf8_validation() {
