@@ -31,7 +31,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
                 "文件",
                 true,
                 &[
-                    &action("new", "新建文档", Some("CmdOrCtrl+N"))?,
+                    &action("new", "新建 MD", Some("CmdOrCtrl+N"))?,
+                    &action("new-text", "新建文本", Some("CmdOrCtrl+Shift+N"))?,
                     &action("open", "打开文件…", Some("CmdOrCtrl+O"))?,
                     &action("directory", "打开目录…", Some("CmdOrCtrl+Shift+O"))?,
                     &PredefinedMenuItem::separator(app)?,

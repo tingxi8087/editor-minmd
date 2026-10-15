@@ -1,4 +1,7 @@
+mod background;
 mod menu;
+mod reliability;
+mod resources;
 mod workspace;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -31,18 +34,30 @@ struct SaveRequest {
     save_as: bool,
     #[serde(default)]
     protected_paths: Vec<String>,
+    #[serde(default)]
+    resources: Option<resources::ResourceContext>,
+    #[serde(default)]
+    suggested_name: Option<String>,
 }
 
 fn read_document(path: &Path) -> Result<DocumentFile, String> {
-    let meta = fs::metadata(path).map_err(|e| format!("无法读取文件：{e}"))?;
-    if !meta.is_file() {
-        return Err("请选择 Markdown 文件".into());
+    use std::io::Read;
+    let file = fs::File::open(path).map_err(|e| format!("无法读取文件：{e}"))?;
+    if !file.metadata().map_err(|e| e.to_string())?.is_file() {
+        return Err("请选择普通文本文件".into());
     }
-    if meta.len() > 16 * 1024 * 1024 {
-        return Err("当前版本支持 16 MB 以内的 Markdown 文件".into());
+    let mut bytes = Vec::new();
+    file.take(16 * 1024 * 1024 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| format!("无法读取文件：{e}"))?;
+    if bytes.len() > 16 * 1024 * 1024 {
+        return Err("当前版本支持 16 MB 以内的 UTF-8 文本文件".into());
     }
-    let content = fs::read_to_string(path)
+    let content = String::from_utf8(bytes)
         .map_err(|e| format!("无法按 UTF-8 读取文件，请先转换编码：{e}"))?;
+    if content.contains('\0') {
+        return Err("文件包含 NUL 字节，可能是二进制文件，未作为文本打开".into());
+    }
     Ok(DocumentFile {
         path: path.to_string_lossy().into_owned(),
         name: path
@@ -56,6 +71,9 @@ fn read_document(path: &Path) -> Result<DocumentFile, String> {
 
 // Compare with the opened snapshot before replacing the file. Failed writes leave the original intact.
 fn write_document(path: &Path, content: &str, expected: Option<&str>) -> Result<(), String> {
+    if content.contains('\0') {
+        return Err("正文包含 NUL 字节，未写入文本文件".into());
+    }
     if let Some(expected) = expected {
         let current =
             fs::read_to_string(path).map_err(|e| format!("原文件无法读取，未保存：{e}"))?;
@@ -90,12 +108,7 @@ fn write_document(path: &Path, content: &str, expected: Option<&str>) -> Result<
 #[tauri::command]
 async fn open_document(app: tauri::AppHandle) -> Result<Option<DocumentFile>, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let Some(file) = app
-            .dialog()
-            .file()
-            .add_filter("Markdown", &["md", "markdown", "mdown"])
-            .blocking_pick_file()
-        else {
+        let Some(file) = app.dialog().file().blocking_pick_file() else {
             return Ok(None);
         };
         let path = file
@@ -136,11 +149,10 @@ async fn save_document(
                 .as_deref()
                 .and_then(|p| Path::new(p).file_name())
                 .map(|s| s.to_string_lossy().into_owned())
-                .unwrap_or("未命名.md".into());
+                .unwrap_or_else(|| request.suggested_name.clone().unwrap_or("未命名.md".into()));
             let Some(file) = app
                 .dialog()
                 .file()
-                .add_filter("Markdown", &["md", "markdown"])
                 .set_file_name(suggested)
                 .blocking_save_file()
             else {
@@ -174,7 +186,9 @@ async fn save_document(
         } else {
             None
         };
-        write_document(&path, &request.content, expected.as_deref())?;
+        let content =
+            resources::rebase_content(&request.content, request.resources.as_ref(), &path)?;
+        write_document(&path, &content, expected.as_deref())?;
         app.state::<OpenedFiles>()
             .0
             .lock()
@@ -188,7 +202,7 @@ async fn save_document(
                 .unwrap_or_default()
                 .to_string_lossy()
                 .into_owned(),
-            content: request.content,
+            content,
         }))
     })
     .await
@@ -204,20 +218,47 @@ fn release_document(path: String, files: State<'_, OpenedFiles>) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _, _| {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
+    }));
+    builder
         .manage(OpenedFiles::default())
+        .manage(reliability::RecoveryLock::default())
+        .manage(reliability::DocumentWatcher::default())
         .manage(workspace::WorkspaceRoot::default())
         .plugin(tauri_plugin_dialog::init())
         .menu(menu::build)
         .on_menu_event(menu::dispatch)
+        .manage(background::BackgroundIo::default())
         .invoke_handler(tauri::generate_handler![
+            background::load_background,
+            background::choose_background,
+            background::set_background_options,
+            background::reset_background,
+            resources::load_document_image,
+            resources::import_document_image,
+            resources::open_document_link,
+            reliability::load_drafts,
+            reliability::write_drafts,
+            reliability::authorize_draft,
+            reliability::check_documents,
+            reliability::watch_documents,
             open_document,
             save_document,
             release_document,
             workspace::open_directory,
             workspace::list_directory,
             workspace::read_workspace_document,
-            workspace::close_directory
+            workspace::close_directory,
+            workspace::create_workspace_entry,
+            workspace::rename_workspace_entry,
+            workspace::trash_workspace_entry
         ])
         .run(tauri::generate_context!())
         .expect("无法启动 MinMD");
@@ -257,6 +298,35 @@ mod tests {
         assert!(reject_open_target(&target, &[target.to_string_lossy().into_owned()]).is_err());
         assert_eq!(fs::read_to_string(&target).unwrap(), "original");
         assert!(reject_open_target(&target, &[]).is_ok());
+    }
+    #[test]
+    fn plain_code_files_preserve_literal_utf8_bom_crlf_and_trailing_lines() {
+        let dir = tempfile::tempdir().unwrap();
+        for name in ["中文.ts", "config.json", "notes.txt", "Dockerfile"] {
+            let path = dir.path().join(name);
+            let source =
+                "\u{feff}// # literal Markdown\r\nconst html = \"<div>**原样**</div>\";\r\n\r\n";
+            fs::write(&path, source).unwrap();
+            let file = read_document(&path).unwrap();
+            assert_eq!(file.content, source);
+            let content = format!("{source}// edit\r\n");
+            write_document(&path, &content, Some(source)).unwrap();
+            assert_eq!(read_document(&path).unwrap().content, content);
+        }
+    }
+    #[test]
+    fn rejects_binary_nul_and_oversized_reads_without_replacing_existing_text() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("binary.bin");
+        fs::write(&path, b"abc\0def").unwrap();
+        assert!(read_document(&path).unwrap_err().contains("NUL"));
+        fs::write(&path, "original").unwrap();
+        assert!(write_document(&path, "new\0text", Some("original")).is_err());
+        assert_eq!(fs::read_to_string(&path).unwrap(), "original");
+        let file = fs::File::create(&path).unwrap();
+        file.set_len(16 * 1024 * 1024 + 1).unwrap();
+        assert!(read_document(&path).unwrap_err().contains("16 MB"));
+        assert!(read_document(dir.path()).is_err());
     }
     #[test]
     fn new_file_and_utf8_validation() {

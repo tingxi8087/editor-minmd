@@ -17,6 +17,11 @@ describe("Markdown file fidelity", () => {
     expect(unsupportedMarkdown("````html\n<div>hello</div>\n```\n````")).toBeNull();
     expect(unsupportedMarkdown("~~~\n<div>hello</div>\n~~~")).toBeNull();
   });
+  it("roundtrips image labels with brackets and relative links", () => {
+    const manager = new MarkdownManager({ extensions: editorExtensions() });
+    const parsed = manager.parse('![中文 \\[图片\\]](assets/a%20b.png "说明")\n\n[下一页](../笔记.md#标题)');
+    expect(manager.parse(manager.serialize(parsed))).toEqual(parsed);
+  });
   it("roundtrips common document structures through the actual editor schema", () => {
     const manager = new MarkdownManager({ extensions: editorExtensions() });
     const input = "# 中文标题\n\n**粗体**和*斜体*以及~~删除~~\n\n- [x] 完成\n- [ ] 待办\n\n> 引用\n\n| 名称 | 值 |\n| --- | --- |\n| 测试 | 123 |\n\n```ts\nconst a = 1;\n```\n";

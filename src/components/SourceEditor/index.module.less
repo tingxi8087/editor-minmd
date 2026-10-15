@@ -1,0 +1,23 @@
+.source {
+  --source-keyword: #925268; --source-string: #54745a; --source-number: #a16b38; --source-type: #556f85; --source-tag: #756347;
+  flex: 1; min-height: 0; min-width: 0; overflow: hidden; background: var(--paper); color: var(--ink);
+  :global(.cm-editor) { height: 100%; background: transparent; font: 13px/1.65 "SFMono-Regular", Menlo, Consolas, "PingFang SC", monospace; }
+  :global(.cm-focused) { outline: none; }
+  :global(.cm-scroller) { font-family: inherit; overflow: auto; }
+  :global(.cm-content) { padding: 10px 0 54px; caret-color: var(--ink); }
+  :global(.cm-line) { padding: 0 16px 0 10px; }
+  :global(.cm-gutters) { border: 0; border-right: 1px solid var(--line); color: var(--muted); background: var(--desk); font-size: 11px; }
+  :global(.cm-gutterElement) { padding-left: 8px; padding-right: 6px; }
+  :global(.cm-activeLine), :global(.cm-activeLineGutter) { background: var(--wash); }
+  :global(.cm-selectionBackground), :global(.cm-focused .cm-selectionBackground), :global(.cm-selectionMatch) { background: var(--selection) !important; }
+  :global(.cm-cursor) { border-left-color: var(--ink); }
+  :global(.cm-panels) { color: var(--ink); background: var(--desk); border-color: var(--line); font: 12px/1.6 "PingFang SC", sans-serif; }
+  :global(.cm-textfield), :global(.cm-button) { background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: 3px; font-size: 12px; }
+  :global(.cm-search) { padding: 5px 30px 5px 8px; label { display: inline-flex; align-items: center; gap: 3px; margin: 0 7px 3px 0; white-space: nowrap; } input[type="checkbox"] { margin: 0; accent-color: var(--ink); } }
+  :global(.cm-search .cm-textfield) { width: 190px; max-width: 38vw; padding: 3px 6px; height: 26px; box-sizing: border-box; margin: 0 5px 3px 0; }
+  :global(.cm-search .cm-button) { background-image: none; padding: 3px 7px; min-height: 26px; margin: 0 5px 3px 0; }
+  :global(.cm-searchMatch) { background: #d6bd7244; outline: 1px solid #a28c4e; }
+  :global(.cm-foldPlaceholder) { background: var(--wash); color: var(--secondary); border: 1px solid var(--line); }
+}
+:global(.has-background) .source { background: transparent; }
+:global(.dark) .source { --source-keyword: #d597a7; --source-string: #a0bb91; --source-number: #d5b17c; --source-type: #9fbed3; --source-tag: #d3bd91; }

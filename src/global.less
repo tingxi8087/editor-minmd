@@ -8,8 +8,9 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--link, #5a7
 .pi-theme, #root > .pi-theme > div { height: 100%; }
 .workspace {
   --paper: #fffefa; --desk: #f5f3ee; --wash: #f4f3ef; --ink: #30322e; --secondary: #777970; --muted: #a2a398; --line: #e5e5dc; --selection: #e9ebe3; --link: #52756f;
-  height: 100dvh; min-width: 700px; display: flex; flex-direction: column; color: var(--ink); background: var(--paper); font-size: 13px;
-  &.dark { --paper: #252722; --desk: #1f211d; --wash: #2e302a; --ink: #e4e4d9; --secondary: #a3a69a; --muted: #7c8173; --line: #3d4036; --selection: #3b4236; --link: #a2bdb3; color-scheme: dark; }
+  --paper-rgb: 255, 254, 250; --desk-rgb: 245, 243, 238;
+  position: relative; isolation: isolate; overflow: hidden; height: 100dvh; min-width: 700px; display: flex; flex-direction: column; color: var(--ink); background: var(--paper); font-size: 13px;
+  &.dark { --paper-rgb: 37, 39, 34; --desk-rgb: 31, 33, 29; --paper: #252722; --desk: #1f211d; --wash: #2e302a; --ink: #e4e4d9; --secondary: #a3a69a; --muted: #7c8173; --line: #3d4036; --selection: #3b4236; --link: #a2bdb3; color-scheme: dark; }
 }
 .titlebar { display: flex; flex: 0 0 40px; align-items: center; justify-content: space-between; padding: 0 12px; background: var(--desk); border-bottom: 1px solid var(--line); user-select: none; }
 .window-overlay .titlebar { padding-left: 84px; }
@@ -56,9 +57,15 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--link, #5a7
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
 .sidebar-switch { padding: 0 6px; gap: 2px; button { display: flex; align-items: center; justify-content: center; height: 25px; padding: 0 6px; border: 0; background: none; color: var(--secondary); font-size: 11px; border-radius: 3px; &:hover, &.active { color: var(--ink); background: var(--selection); } } > span { flex: 1; } }
 .sidebar-scroll { flex: 1; min-height: 0; overflow: auto; }
-.opened-heading { display: flex; justify-content: space-between; color: var(--muted); padding: 14px 12px 6px; font-size: 10px; border-top: 1px solid var(--line); margin-top: 6px; }
-.opened-file { display: flex; align-items: center; gap: 5px; width: 100%; padding: 5px 12px; border: 0; background: none; color: var(--secondary); text-align: left; font-size: 11px; > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; } &:hover, &.active { color: var(--ink); background: var(--selection); } }
 .tab-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; &[hidden] { display: none; } }
 .tabbar { min-width: 0; > .quiet-button { flex-shrink: 0; } }
 .empty-workbench { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; color: var(--secondary); font-family: "Songti SC", serif; }
 @media (max-width: 1050px) { .close-others { display: none; } .view-switch { gap: 0; margin-right: 0; button { padding: 4px; } } .statusbar > div { gap: 8px; } }
+
+.editor-surface { display: flex; flex: 1; min-height: 0; min-width: 0; overflow: hidden; &[hidden] { display: none; } }
+.source-toolbar { select { max-width: 180px; border: 0; outline: none; background: transparent; color: var(--ink); font-size: 11px; height: 26px; } .quiet-button { margin-left: 0; font-size: 11px; } }
+.source-wrap { display: flex; align-items: center; gap: 4px; margin-left: 10px; white-space: nowrap; font-size: 11px; color: var(--secondary); input { accent-color: var(--ink); margin: 0; } }
+
+.workspace-background { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; img { display: block; width: calc(100% + 120px); height: calc(100% + 120px); max-width: none; position: absolute; left: -60px; top: -60px; object-fit: cover; } > div { position: absolute; inset: 0; background: var(--desk); } }
+.has-background { .titlebar, .activitybar, .sidebar, .tabbar, .statusbar { background: rgba(var(--desk-rgb), .76); } .formatbar { background: rgba(var(--paper-rgb), .86); } .tab-panel, .empty-workbench { background: rgba(var(--paper-rgb), .92); } }
+.appearance-warning { position: absolute; right: 3px; top: 3px; width: 5px; height: 5px; border-radius: 50%; background: #b28b4b; }

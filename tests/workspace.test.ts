@@ -8,12 +8,18 @@ const file = (name: string, content = `# ${name}\n\n正文`) => ({ path: `/notes
 const entry = (path: string, isDirectory = false): DirectoryEntry => ({ path, name: path.split('/').pop()!, isDirectory, isMarkdown: !isDirectory, isSymlink: false });
 function setup() {
   const gateway = {
+    loadImage: vi.fn<FileGateway['loadImage']>().mockResolvedValue('data:image/png;base64,iVBORw0KGgo='),
+    importImage: vi.fn<FileGateway['importImage']>().mockResolvedValue({ reference: 'assets/image.png', name: '粘贴图片' }),
+    openLink: vi.fn<FileGateway['openLink']>().mockResolvedValue(null),
     openDocument: vi.fn<FileGateway['openDocument']>().mockResolvedValue(null),
     saveDocument: vi.fn<FileGateway['saveDocument']>().mockImplementation(async (path, content) => ({ path: path ?? '/notes/saved.md', name: path?.split('/').pop() ?? 'saved.md', content })),
     releaseDocument: vi.fn<FileGateway['releaseDocument']>().mockResolvedValue(undefined),
     openDirectory: vi.fn<FileGateway['openDirectory']>().mockResolvedValue(null),
     listDirectory: vi.fn<FileGateway['listDirectory']>().mockResolvedValue([]),
     readWorkspaceDocument: vi.fn<FileGateway['readWorkspaceDocument']>().mockImplementation(async (_, path) => ({ path, name: path.split('/').pop()!, content: '# loaded' })),
+    createEntry: vi.fn().mockResolvedValue("/notes/new.md"),
+    renameEntry: vi.fn().mockResolvedValue("/notes/renamed.md"),
+    trashEntry: vi.fn().mockResolvedValue(undefined),
     closeDirectory: vi.fn<FileGateway['closeDirectory']>().mockResolvedValue(undefined),
   };
   const model = new WorkspaceModel(gateway); models.push(model); return { model, gateway };
@@ -47,7 +53,9 @@ describe('multiple document sessions', () => {
   it('creates independent unsaved documents and preserves drafts when opening another file', () => {
     const { model } = setup(); const a = model.create()!; edit(model, a.id, 'draft'); const b = model.create()!;
     expect(model.tabs).toHaveLength(2); expect(a.editor).not.toBe(b.editor); expect(model.markdown(a)).toContain('draft');
-    model.openFile(file('disk')); expect(model.hasDirty).toBe(true); expect(model.tabs).toHaveLength(3);
+    expect([a.name, b.name]).toEqual(['未命名.md', '未命名 2.md']);
+    const text = model.create('text')!; const text2 = model.create('text')!; expect([text.name, text2.name]).toEqual(['未命名', '未命名 2']); expect(text.mode).toBe('source');
+    model.openFile(file('disk')); expect(model.hasDirty).toBe(true); expect(model.tabs).toHaveLength(5);
   });
   it('saves exactly the requested tab and protects all other open paths', async () => {
     const { model, gateway } = setup(); const a = model.openFile(file('A')); edit(model, a.id, 'only A');
@@ -69,11 +77,13 @@ describe('multiple document sessions', () => {
     gateway.saveDocument.mockRejectedValueOnce('external conflict'); expect(await model.save(a.id)).toBe(false);
     expect(model.error).toBe('external conflict'); expect(model.markdown(a)).toContain('must keep'); expect(a.dirty).toBe(true);
   });
-  it('updates a Save As path and releases the old native authorization', async () => {
+  it('updates a Save As path and retains the resource base until the tab closes', async () => {
     const { model, gateway } = setup(); const a = model.openFile(file('A'));
     gateway.saveDocument.mockResolvedValueOnce({ ...file('new'), content: '# A' });
     await model.save(a.id, true); expect(a.path).toBe('/notes/new.md'); expect(a.name).toBe('new.md');
-    expect(gateway.releaseDocument).toHaveBeenCalledWith('/notes/A.md');
+    expect(a.resourceBase).toBe('/notes/A.md'); expect(gateway.releaseDocument).not.toHaveBeenCalled();
+    model.requestClose([a.id]); await model.completeClose();
+    expect(gateway.releaseDocument).toHaveBeenCalledWith('/notes/A.md'); expect(gateway.releaseDocument).toHaveBeenCalledWith('/notes/new.md');
   });
   it('holds edits read-only during pending native saves and ignores tab-switch requests', async () => {
     const { model, gateway } = setup(); const a = model.openFile(file('A')); edit(model, a.id, 'saving');
@@ -83,10 +93,10 @@ describe('multiple document sessions', () => {
     const saving = model.save(a.id); expect(a.editor!.isEditable).toBe(false); model.activate(b.id); expect(model.activeId).toBe(a.id);
     resolve({ ...file('A'), content: model.markdown(a) }); await saving; expect(a.editor!.isEditable).toBe(true);
   });
-  it('uses read-only original content for unsupported Markdown without damaging other tabs', () => {
+  it('opens unsupported Markdown as editable source without damaging other tabs', () => {
     const { model } = setup(); const a = model.openFile(file('A')); edit(model, a.id, 'draft');
     const b = model.openFile(file('footnote', '正文[^1]\n\n[^1]: 注释'));
-    expect(b.editor).toBeNull(); expect(b.unsupported).toBe('脚注'); expect(model.markdown(b)).toBe(b.raw); expect(a.dirty).toBe(true);
+    expect(b.editor).toBeNull(); expect(b.mode).toBe('source'); expect(b.source).not.toBeNull(); expect(b.unsupported).toBe('脚注'); expect(model.markdown(b)).toBe(b.raw); expect(a.dirty).toBe(true);
   });
 });
 
@@ -185,5 +195,55 @@ describe('directory workspaces', () => {
     const { model, gateway } = setup(); gateway.openDirectory.mockResolvedValue(root()); await model.chooseDirectory(); const a = model.openFile(file('A'));
     await model.closeDirectory(); expect(model.root).toBeNull(); expect(model.children.size).toBe(0); expect(model.active).toBe(a);
     expect(gateway.closeDirectory).toHaveBeenCalledOnce();
+  });
+});
+
+describe('Markdown images and links', () => {
+  it('saves an untitled document before importing an image; cancelled save imports nothing', async () => {
+    const { model, gateway } = setup(); const tab = model.create()!;
+    gateway.saveDocument.mockResolvedValueOnce(null);
+    await model.insertImages(tab.id); expect(gateway.importImage).not.toHaveBeenCalled(); expect(tab.path).toBeNull();
+    await model.insertImages(tab.id); expect(gateway.importImage).toHaveBeenCalledWith('/notes/saved.md', undefined, undefined, undefined);
+    expect(model.markdown(tab)).toContain('![粘贴图片](assets/image.png)'); expect(tab.dirty).toBe(true);
+    expect(tab.editor!.can().undo()).toBe(true);
+    tab.editor!.commands.undo(); expect(model.markdown(tab)).not.toContain('image.png');
+  });
+  it('cancels image picking without changing the document and reports import errors', async () => {
+    const { model, gateway } = setup(); const tab = model.openFile(file('A'));
+    gateway.importImage.mockResolvedValueOnce(null); await model.insertImages(tab.id); expect(tab.dirty).toBe(false);
+    gateway.importImage.mockRejectedValueOnce('图片不能超过 20 MB'); await model.insertImages(tab.id);
+    expect(model.error).toContain('20 MB'); expect(tab.dirty).toBe(false); expect(model.busy).toBe(false);
+  });
+  it('passes native drop paths and does not insert into read-only or other tabs', async () => {
+    const { model, gateway } = setup(); const tab = model.openFile(file('A'));
+    await model.insertImages(tab.id, undefined, ['/tmp/中文图.png', '/tmp/second.png']);
+    expect(gateway.importImage).toHaveBeenCalledTimes(2); expect(gateway.importImage.mock.calls[0][1]).toBe('/tmp/中文图.png');
+    model.setReading(true); await model.insertImages(tab.id); expect(gateway.importImage).toHaveBeenCalledTimes(2);
+    model.openFile(file('B')); await model.insertImages(tab.id); expect(gateway.importImage).toHaveBeenCalledTimes(2);
+  });
+  it('tokenizes only local destinations for Save As, preserving source editor and undo history', async () => {
+    const { model, gateway } = setup(); const tab = model.openFile(file('A', '# A\n\n![中文](assets/a%20b.png)\n\n[笔记](../笔记.md#标题) [网站](https://example.com)\n'));
+    edit(model, tab.id, '编辑'); const before = tab.editor!.getJSON();
+    gateway.saveDocument.mockResolvedValueOnce({ path: '/elsewhere/new.md', name: 'new.md', content: '# saved\n' });
+    await model.save(tab.id, true);
+    const args = gateway.saveDocument.mock.calls[0]; expect(args[5]?.basePath).toBe('/notes/A.md');
+    expect(args[5]?.references.map(ref => ref.value)).toEqual(['assets/a%20b.png', '../笔记.md#标题']);
+    expect(args[1]).toContain('https://example.com'); expect(args[1]).not.toContain('(assets/a%20b.png)');
+    expect(tab.editor!.getJSON()).toEqual(before); expect(tab.editor!.can().undo()).toBe(true);
+    edit(model, tab.id, '再改'); expect(model.markdown(tab)).toContain('../notes/assets/a%20b.png');
+    await model.insertImages(tab.id); expect(tab.editor!.getJSON().content?.some(node => node.type === 'image' && node.attrs?.src === '../elsewhere/assets/image.png')).toBe(true);
+  });
+  it('opens linked Markdown through the same tab controller and deduplicates dirty tabs', async () => {
+    const { model, gateway } = setup(); const a = model.openFile(file('A')); edit(model, a.id, 'unsaved');
+    const b = model.openFile(file('B')); gateway.openLink.mockResolvedValue(file('A', '# external'));
+    await model.openLink(b.id, 'A.md'); expect(model.tabs).toHaveLength(2); expect(model.activeId).toBe(a.id); expect(model.markdown(a)).toContain('unsaved');
+    gateway.openLink.mockRejectedValueOnce('链接文件不存在'); await model.openLink(a.id, 'missing.md'); expect(model.error).toContain('不存在'); expect(model.activeId).toBe(a.id);
+    await model.openLink(a.id, 'javascript:alert(1)'); expect(gateway.openLink).toHaveBeenCalledTimes(2);
+  });
+  it('loads relative images using the document resource base without modifying stored Markdown', async () => {
+    const { model, gateway } = setup(); const raw = '# 标题\n\n![图](assets/图.png)\n';
+    const tab = model.openFile(file('A', raw));
+    await Promise.resolve(); expect(gateway.loadImage).toHaveBeenCalledWith('/notes/A.md', 'assets/图.png');
+    expect(model.markdown(tab)).toBe(raw); expect(tab.dirty).toBe(false);
   });
 });
