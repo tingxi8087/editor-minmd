@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
-import { afterEach, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import { useSettings } from '../src/store/settings';
 import { WorkspaceModel } from '../src/workspace/model';
 import type { WorkspaceSessionGateway, RestoredWorkspace, SavedWorkspace } from '../src/lib/workspaceSession';
 import type { FileGateway } from '../src/lib/files';
 const models: WorkspaceModel[] = [];
+beforeEach(() => useSettings.setState({ markdownMode: "document" }));
 afterEach(() => { models.splice(0).forEach(model => model.dispose()); vi.useRealTimers(); });
 const file = (path: string, content = '# 正文') => ({ path, name: path.split('/').pop()!, content });
 const saved = (paths = ['/notes/a.md', '/notes/b.md'], activePath = paths[0] ?? null): SavedWorkspace => ({ version: 1, directory: '/notes', tabs: paths.map(path => ({ path, mode: 'document', reading: false })), activePath });
@@ -14,12 +16,13 @@ function setup(data = restored()) {
   const model = new WorkspaceModel(files, undefined, undefined, gateway); model.addGuide('# 指南'); models.push(model);
   return { model, gateway, files };
 }
-it('restores directory, ordered saved tabs, active tab and reading/source modes cleanly', async () => {
-  const state = saved(['/notes/a.md','/notes/b.md','/notes/c.ts'],'/notes/b.md'); state.tabs[0].reading=true; state.tabs[2].mode='source';
+it('restores directory, ordered tabs and active tab using the shared Markdown mode instead of old per-tab modes', async () => {
+  useSettings.setState({ markdownMode: 'reading' });
+  const state = saved(['/notes/a.md','/notes/b.md','/notes/c.ts'],'/notes/b.md'); state.tabs[0].reading=true; state.tabs[1].mode='source'; state.tabs[2].mode='source';
   const { model, gateway } = setup(restored(state)); await model.restoreSession();
   expect(model.root?.path).toBe('/notes'); expect(model.tabs.map(t => t.path)).toEqual(state.tabs.map(t => t.path)); expect(model.active?.path).toBe('/notes/b.md');
-  expect(model.tabs[0].reading).toBe(true); expect(model.tabs[2].mode).toBe('source'); expect(model.tabs.every(t => !t.dirty)).toBe(true);
-  expect(model.tabs[0].editor!.isEditable).toBe(false); expect(model.active!.editor!.isEditable).toBe(true);
+  expect(model.tabs[0].reading).toBe(true); expect(model.tabs[1].reading).toBe(true); expect(model.tabs[2].mode).toBe('source'); expect(model.tabs.every(t => !t.dirty)).toBe(true);
+  expect(model.tabs[0].editor!.isEditable).toBe(false); expect(model.active!.editor!.isEditable).toBe(false);
   await model.flushSession(); expect(gateway.write).not.toHaveBeenCalled();
 });
 it('keeps the guide on first launch; records saved paths but never untitled contents', async () => {

@@ -23,7 +23,7 @@
 | 代码高亮 | 文档内代码块使用 Lowlight / Highlight.js 常用语言集合 | [extensions.ts](../src/components/DocumentEditor/extensions.ts) |
 | 文档导航 | 侧栏切换文件/标题大纲；点击标题定位；切换标签恢复各自滚动位置 | [App.tsx](../src/App.tsx) |
 | 文档查找与快捷键 | 文档模式查找/替换、阅读只查找、字面/大小写/循环导航/高亮、全部替换一次撤销；⌘1/2/3 模式切换与设置快捷键页签 | [查找说明](document-search.md) |
-| 阅读与源码 | 阅读模式关闭编辑；CodeMirror 6 编辑 Markdown 源码，模式切换不写盘；普通文本/代码直接源码编辑 | [App.tsx](../src/App.tsx) |
+| 阅读与源码 | 文档/阅读/源码合并为紧凑 Paper Ink Select，保留模式快捷键与统一偏好；阅读模式关闭编辑；CodeMirror 6 编辑 Markdown 源码，模式切换不写盘；普通文本/代码直接源码编辑 | [App.tsx](../src/App.tsx) |
 | 修改与离开保护 | 修改标记；关闭单个/其他标签、关闭窗口和菜单退出时逐份确认；可取消或保存后继续，新建/打开/切换不会替换未保存内容 | [App.tsx](../src/App.tsx) |
 | 编辑会话隔离 | 每个标签保留独立编辑器实例及撤销历史，关闭时销毁并释放原生文件登记；阅读状态变化不触发正文更新 | [model.ts](../src/workspace/model.ts) |
 | 草稿恢复 | 防抖/最大等待、本机原子恢复库、富文本 JSON 或源码字面快照；逐份恢复/丢弃、重名副本、冲突识别、写入失败提示与重试 | [可靠性说明](reliability.md)、[reliability.rs](../src-tauri/src/reliability.rs) |
@@ -32,10 +32,12 @@
 | 文件写入 | 同目录临时文件、保留原文件权限、同步后替换；返回本次保存内容快照 | [lib.rs](../src-tauri/src/lib.rs) |
 | Markdown 文件封装 | 识别并保留 Frontmatter、BOM、LF/CRLF 类型及末尾换行有无；无修改时普通保存不重写文件 | [markdown.ts](../src/lib/markdown.ts)、[App.tsx](../src/App.tsx) |
 | 特殊语法保护 | 检出的脚注、数学块、内嵌 HTML、提示块和部分自定义语法、未闭合围栏转可编辑源码，阻止有损转换 | [markdown.ts](../src/lib/markdown.ts) |
-| 重启工作区恢复 | 本机元数据持久化、工作目录与标签顺序、激活文件、阅读/源码模式、失效路径逐项提示、退出前刷新 | [工作区恢复](workspace-session.md) |
+| 标签右键与统一模式 | 关闭其他/左侧/右侧/全部/已保存，沿用逐份未保存确认；Markdown 文档/阅读/源码统一切换、持久化并应用于新建/新打开/重启恢复 | [标签操作](tab-actions.md) |
+| 重启工作区恢复 | 本机元数据持久化、工作目录与标签顺序、激活文件、统一 Markdown 模式、失效路径逐项提示、退出前刷新 | [工作区恢复](workspace-session.md) |
 | 最近文件与目录 | 顶部紧凑弹层、20/10 条 MRU、本机持久化、单项移除/清空、失效提示、脏标签保护、应用内改名/删除同步 | [最近记录](recent-items.md) |
 | macOS 默认打开方式 | 分组/扩展名勾选、全选/半选、记住选择、逐项写入与回读；非文本冲突跳过；访达启动/运行中打开进入同一工作台，保留已打开脏内容 | [关联设置与验收](file-associations.md) |
 | 自定义背景 | 本地 PNG/JPEG/WebP 副本、模糊/遮罩即时预览、原生清单持久化、重启恢复、恢复默认与旧图清理；固定正文纸面保护 | [背景说明](background.md)、[background.rs](../src-tauri/src/background.rs) |
+| 侧栏缩进与调宽 | 文件树/大纲每级 8px，右边缘拖拽、键盘调宽、双击复位，宽度持久化并限制正文最小空间 | [侧栏布局](sidebar-layout.md) |
 | 紧凑纸墨外观 | 主题、侧栏显隐；全宽正文；缩小工具区、段落和任务间距；主题/侧栏偏好持久化于 localStorage；左侧移除「已打开」列表，使用顶部标签 | [global.less](../src/global.less)、[正文样式](../src/components/DocumentEditor/index.module.less)、[settings.ts](../src/store/settings.ts) |
 | macOS 合并标题栏 | 原生关闭/最小化/全屏按钮与文件操作同一行；顶部按打开文件、打开目录排序，保存通过快捷键/菜单；空白处可拖动，显示文件名与未保存状态 | [窗口配置](../src-tauri/tauri.conf.json)、[权限](../src-tauri/capabilities/default.json)、[App.tsx](../src/App.tsx) |
 | 基础项目交付 | MIT 文件、源码依赖锁文件、开发说明、示例 Markdown、macOS 本地调试应用包 | [LICENSE](../LICENSE)、[README](../README.md)、[示例](../examples/纸墨试写.md) |
@@ -49,7 +51,7 @@
 | 能力 | 已有基础 | 尚缺部分 |
 | --- | --- | --- |
 | 源码/代码扩展 | CodeMirror、语法高亮、行号、语言切换、查找替换 | 跳转行、目录搜索、编码选择、大文件实测；不含 LSP/调试器 |
-| 文件管理 | 目录树、独立标签、关闭其他标签、目录外文件 | 跨目录移动、多选、标签排序、复制路径、在系统文件管理器显示 |
+| 文件管理 | 目录树、独立标签、右键批量关闭、目录外文件 | 跨目录移动、多选、标签排序、复制路径、在系统文件管理器显示 |
 | 链接扩展 | 插入/修改/移除、网页/本地 Markdown/标题锚点访问已提供 | 非 Markdown 本地文件、其他方言锚点 |
 | 图片扩展 | 相对路径预览、选图/粘贴/拖入、assets 保存、缺失占位 | 替换与替代文字入口、尺寸调整、SVG、附件清理；Finder 实际拖放人工验收 |
 | 表格扩展 | 行列管理、整列对齐、临时列宽与横向滚动 | 不提供合并单元格等普通 Markdown 无法稳定表达的布局；像素列宽不写入 Markdown |

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App as InkApp, ConfigProvider } from "paper-ink";
 import type { WorkspaceSessionGateway } from "../src/lib/workspaceSession";
 import { RecentModel, type RecentGateway } from "../src/lib/recents";
+import { useSettings } from "../src/store/settings";
 import { Workspace } from "../src/App";
 import { BackgroundModel, type BackgroundGateway } from "../src/lib/background";
 import { WorkspaceModel } from "../src/workspace/model";
@@ -69,8 +70,16 @@ const fixture = (recent?: RecentModel, session?: WorkspaceSessionGateway) => {
 };
 const mounted: WorkspaceModel[] = [];
 const setup = () => { const value = fixture(); mounted.push(value.model); return value; };
+const chooseMode = async (user: ReturnType<typeof userEvent.setup>, mode: string) => {
+  // Let the workbench's scheduled editor focus complete before opening a popup.
+  await act(async () => { await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); });
+  const select = screen.getByRole('combobox', { name: 'Markdown 模式' }) as HTMLInputElement;
+  await waitFor(() => expect(select.disabled).toBe(false));
+  await user.click(select);
+  await user.click(await screen.findByRole('option', { name: { document: '文档', reading: '阅读', source: '源码' }[mode]! }));
+};
 const edit = (model: WorkspaceModel, text: string) => act(() => { const editor = model.active!.editor!; editor.commands.insertContentAt(editor.state.doc.content.size - 1, text); });
-beforeEach(() => {
+beforeEach(() => { useSettings.setState({ markdownMode: "document" });
   HTMLElement.prototype.scrollIntoView = vi.fn();
   platform.destroy.mockClear();
 });
@@ -84,11 +93,19 @@ describe('workspace UI integration', () => {
     await waitFor(() => expect((screen.getByRole('button', { name: '查找文档' }) as HTMLButtonElement).disabled).toBe(false));
     fireEvent.keyDown(window, { key: '2', metaKey: true });
     expect(model.active!.reading).toBe(true); expect(model.active!.editor!.isEditable).toBe(false);
+    expect(model.tabs.every(tab => tab.reading)).toBe(true);
     fireEvent.keyDown(window, { key: '3', metaKey: true });
+    expect(model.active!.mode).toBe('source');
+    expect(screen.getByRole('combobox', { name: 'Markdown 模式' }).closest('.pi-select')?.textContent).toContain('源码');
+    expect(model.tabs.every(tab => tab.mode === 'source')).toBe(true);
+    act(() => { model.openFile({ path: '/notes/next.md', name: 'next.md', content: raw }); });
     expect(model.active!.mode).toBe('source');
     fireEvent.keyDown(window, { key: '1', metaKey: true });
     expect(model.active!.mode).toBe('document'); expect(model.active!.reading).toBe(false); expect(model.active!.editor!.isEditable).toBe(true);
     expect(model.markdown(model.active!)).toBe(raw); expect(model.active!.dirty).toBe(false);
+    await chooseMode(user, 'reading');
+    expect(model.tabs.every(tab => tab.reading)).toBe(true);
+    await chooseMode(user, 'document');
     await user.click(screen.getByRole('button', { name: '设置' }));
     fireEvent.keyDown(window, { key: '3', metaKey: true }); expect(model.active!.mode).toBe('document');
     await user.click(within(screen.getByRole('dialog')).getAllByRole('button', { name: '关闭' }).at(-1)!);
@@ -150,7 +167,7 @@ describe('workspace UI integration', () => {
     expect(editor.isActive('bold')).toBe(false); expect(model.markdown(model.active!)).toBe(before); expect(model.active!.dirty).toBe(false);
     fireEvent.keyDown(editor.view.dom, { key: 'b', metaKey: true });
     expect(toggle.getAttribute('aria-expanded')).toBe(initial);
-    await user.click(screen.getByRole('button', { name: '源码' }));
+    await chooseMode(user, 'source');
     fireEvent.keyDown(screen.getByRole('textbox', { name: '源码编辑器' }), { key: 'b', ctrlKey: true });
     expect(toggle.getAttribute('aria-expanded')).not.toBe(initial);
     fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
@@ -168,7 +185,7 @@ describe('workspace UI integration', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull()); expect(editor.getText()).toBe('2026-10-16');
     act(() => { editor.commands.undo(); }); expect(editor.getText()).toBe('/date');
     act(() => { editor.commands.redo(); });
-    await user.click(screen.getByRole('button', { name: '源码' }));
+    await chooseMode(user, 'source');
     expect(model.active!.source?.text()).toContain('2026-10-16');
   });
   it('routes slash image import through the existing file gateway and leaves cancelled command untouched', async () => {
@@ -246,8 +263,8 @@ describe('workspace UI integration', () => {
   it('switching reading mode or selecting a duplicate file never dirties clean tabs', async () => {
     const { model, gateway, user } = setup(); gateway.openDocument.mockResolvedValue({ path: '/outside/A.md', name: 'A.md', content: '# outside' });
     await user.click(screen.getByRole('button', { name: '打开文件' }));
-    await user.click(screen.getByRole('button', { name: '阅读' })); expect(model.active!.editor!.isEditable).toBe(false);
-    await user.click(screen.getByRole('button', { name: '文档' })); expect(model.active!.editor!.isEditable).toBe(true);
+    await chooseMode(user, 'reading'); expect(model.active!.editor!.isEditable).toBe(false);
+    await chooseMode(user, 'document'); expect(model.active!.editor!.isEditable).toBe(true);
     await user.click(screen.getByRole('button', { name: '打开文件' })); expect(model.tabs).toHaveLength(2); expect(model.hasDirty).toBe(false);
   });
   it('inserts, edits, opens and removes a link through the actual toolbar dialog', async () => {
@@ -263,10 +280,10 @@ describe('workspace UI integration', () => {
     const input = screen.getByRole('textbox', { name: '链接地址' }); await user.clear(input); await user.type(input, 'C.md');
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: '应用' }));
     expect(model.markdown(model.active!)).toContain('[另一页](C.md)');
-    await user.click(screen.getByRole('button', { name: '阅读' }));
+    await chooseMode(user, 'reading');
     fireEvent.click(screen.getByRole('link', { name: '另一页' }));
     expect(gateway.openLink).toHaveBeenCalledWith('/notes/A.md', 'C.md');
-    await user.click(screen.getByRole('button', { name: '文档' }));
+    await chooseMode(user, 'document');
     act(() => { model.active!.editor!.commands.setTextSelection(2); });
     await user.click(screen.getByRole('button', { name: '编辑链接' }));
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: '移除链接' }));
@@ -351,21 +368,21 @@ describe('workspace UI integration', () => {
   it('switches Markdown between editable CodeMirror source and document without losing edits', async () => {
     const { model, user, gateway } = setup();
     act(() => { model.openFile({ path: '/notes/A.md', name: 'A.md', content: '# Title\n\n正文\n' }); });
-    await user.click(screen.getByRole('button', { name: '源码' }));
+    await chooseMode(user, 'source');
     expect(screen.getByRole('textbox', { name: '源码编辑器' }).getAttribute('contenteditable')).toBe('true');
     const source = model.active!.source!;
     await act(async () => { await source.languageReady; source.dispatch({ changes: { from: source.state.doc.length, insert: '\n源码补充' } }); });
     expect(document.querySelector('.cm-lineNumbers')?.textContent).toContain('1');
-    await user.click(screen.getByRole('button', { name: '文档' }));
+    await chooseMode(user, 'document');
     expect(screen.getByRole('tabpanel').textContent).toContain('源码补充');
-    await user.click(screen.getByRole('button', { name: '源码' }));
+    await chooseMode(user, 'source');
     await act(async () => { platform.menu?.({ payload: 'save' }); });
     expect(gateway.saveDocument.mock.calls[0][1]).toContain('源码补充'); expect(model.active!.dirty).toBe(false);
   });
   it('opens code with real line gutters/highlight spans and wires undo, language and wrap controls', async () => {
     const { model, user } = setup();
     await act(async () => { model.openFile({ path: '/notes/a.ts', name: 'a.ts', content: 'const answer: number = 42;\nconsole.log(answer);\n' }); await model.active!.source!.languageReady; });
-    expect(screen.queryByRole('button', { name: '文档' })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Markdown 模式' })).toBeNull();
     expect(screen.getByRole('textbox', { name: '源码编辑器' }).getAttribute('contenteditable')).toBe('true');
     expect(document.querySelector('.cm-lineNumbers')?.textContent).toContain('2');
     await waitFor(() => expect(document.querySelector('.cm-line span')).not.toBeNull());
@@ -393,8 +410,9 @@ describe('workspace UI integration', () => {
     expect(model.active!.kind).toBe('text'); expect(screen.getByRole('textbox', { name: '源码编辑器' })).toBeTruthy();
     gateway.openDocument.mockResolvedValue({ path: '/notes/special.md', name: 'special.md', content: '<!-- keep -->\n\n[^a]: footnote' });
     await user.click(screen.getByRole('button', { name: '打开文件' })); expect(model.active!.mode).toBe('source');
-    await user.click(screen.getByRole('button', { name: '文档' })); expect(model.active!.mode).toBe('source');
+    await chooseMode(user, 'document'); expect(model.active!.mode).toBe('source');
     expect(screen.getByRole('alert').textContent).toContain('源码模式');
+    expect(screen.getByRole('combobox', { name: 'Markdown 模式' }).closest('.pi-select')?.textContent).toContain('源码');
     expect(screen.getByRole('textbox', { name: '源码编辑器' }).getAttribute('contenteditable')).toBe('true');
   });
   it('all closed tabs leave a working empty state, and a new document can still be created', async () => {
@@ -516,6 +534,7 @@ it('opens recent directories through the compact header and retains missing reco
 });
 
 it('restores saved tabs in the existing compact layout and shows recoverable failure details', async () => {
+  useSettings.setState({ markdownMode: 'reading' });
   const state = {version:1 as const,directory:null,tabs:[{path:'/a.md',mode:'document' as const,reading:false},{path:'/b.md',mode:'document' as const,reading:true}],activePath:'/b.md'};
   const session: WorkspaceSessionGateway = {restore:vi.fn().mockResolvedValue({exists:true,session:state,root:null,tabs:state.tabs.map(tab=>({...tab,file:{path:tab.path,name:tab.path.slice(1),content:'# 恢复正文'}})),errors:['文件恢复失败：missing.md']}),write:vi.fn().mockResolvedValue(undefined)};
   const {model,user}=fixture(undefined,session); mounted.push(model);

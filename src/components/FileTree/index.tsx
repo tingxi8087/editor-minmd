@@ -32,9 +32,9 @@ export default function FileTree({ workspace }: { workspace: WorkspaceModel }) {
 
   if (!root) return <div className={styles.empty}><p>打开一个目录，浏览本地文件。</p><button onClick={() => void workspace.chooseDirectory()} disabled={workspace.busy}><IconFolderOpen size={15} stroke={1.6} />打开目录</button></div>;
   const renderChildren = (path: string, depth: number) => <>
-    {workspace.loading.has(path) && <li role="none" className={styles.hint} style={{ paddingLeft: 12 + depth * 12 }}>正在读取…</li>}
+    {workspace.loading.has(path) && <li role="none" className={styles.hint} style={{ paddingLeft: 12 + depth * 8 }}>正在读取…</li>}
     {workspace.treeErrors.has(path) && <li role="none" className={styles.hint}><span role="alert">{workspace.treeErrors.get(path)}</span><button disabled={workspace.busy} onClick={() => void workspace.loadDirectory(path)}>重试</button></li>}
-    {!workspace.loading.has(path) && workspace.children.get(path)?.length === 0 && <li role="none" className={styles.hint} style={{ paddingLeft: 12 + depth * 12 }}>空目录</li>}
+    {!workspace.loading.has(path) && workspace.children.get(path)?.length === 0 && <li role="none" className={styles.hint} style={{ paddingLeft: 12 + depth * 8 }}>空目录</li>}
     {workspace.children.get(path)?.map((entry) => renderEntry(entry, depth))}
   </>;
   const renderEntry = (entry: DirectoryEntry, depth: number) => {
@@ -43,7 +43,7 @@ export default function FileTree({ workspace }: { workspace: WorkspaceModel }) {
     const disabled = entry.isSymlink || (!entry.isDirectory && entry.isFile === false);
     const Icon = entry.isDirectory ? expanded ? IconFolderOpen : IconFolder : entry.isMarkdown ? IconMarkdown : IconFile;
     return <li role="treeitem" aria-expanded={entry.isDirectory ? expanded : undefined} aria-selected={active} key={entry.path}>
-      <div className={styles.itemRow}><button onContextMenu={event => { event.preventDefault(); if (!disabled) showMenu(entry, event.clientX, event.clientY); }} onKeyDown={event => { if (event.key === 'F2' && entry.path !== root.path) { event.preventDefault(); begin('rename', entry); } }} className={`${styles.row} ${active ? styles.active : ""}`} data-path={entry.path} title={`${entry.path}${disabled ? entry.isSymlink ? " · 暂不展开符号链接" : " · 不是普通文件" : ""}`} disabled={workspace.busy || disabled} style={{ paddingLeft: 8 + depth * 12 }} onClick={() => void (entry.isDirectory ? workspace.toggleDirectory(entry.path) : workspace.openTreeFile(entry))}>
+      <div className={styles.itemRow}><button onContextMenu={event => { event.preventDefault(); if (!disabled) showMenu(entry, event.clientX, event.clientY); }} onKeyDown={event => { if (event.key === 'F2' && entry.path !== root.path) { event.preventDefault(); begin('rename', entry); } }} className={`${styles.row} ${active ? styles.active : ""}`} data-path={entry.path} title={`${entry.path}${disabled ? entry.isSymlink ? " · 暂不展开符号链接" : " · 不是普通文件" : ""}`} disabled={workspace.busy || disabled} style={{ paddingLeft: 8 + depth * 8 }} onClick={() => void (entry.isDirectory ? workspace.toggleDirectory(entry.path) : workspace.openTreeFile(entry))}>
         {entry.isDirectory ? expanded ? <IconChevronDown size={12} /> : <IconChevronRight size={12} /> : <span className={styles.spacer} />}
         <Icon size={15} stroke={1.5} /><span>{entry.name}</span>
         {workspace.tabs.some((tab) => tab.path === entry.path && tab.dirty) && <i className="dirty-dot" />}

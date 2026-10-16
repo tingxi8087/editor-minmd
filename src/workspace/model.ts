@@ -1,3 +1,4 @@
+import { preferredMarkdownMode, useSettings, type MarkdownMode } from "@/store/settings";
 import type { SavedWorkspace, WorkspaceSessionGateway } from "@/lib/workspaceSession";
 import type { RecentModel } from "@/lib/recents";
 import { isLocalReference, mapReferences, rebaseReference, referenceMarkdown, validLink } from "@/lib/resources";
@@ -117,9 +118,7 @@ export class WorkspaceModel {
         }
         for (const saved of restored.tabs) {
           if (this.tabs.some(tab => tab.path === saved.file.path)) continue;
-          const tab = this.add(saved.file.name, saved.file.content, saved.file.path, false);
-          if (saved.mode === 'source' && tab.mode !== 'source') { tab.mode = 'source'; this.attachSource(tab); }
-          tab.reading = tab.mode === 'document' && saved.reading;
+          this.add(saved.file.name, saved.file.content, saved.file.path, false);
         }
         this.activeId = this.tabs.find(tab => tab.path === restored.session.activePath)?.id ?? this.tabs[0]?.id ?? null;
       }
@@ -150,15 +149,15 @@ export class WorkspaceModel {
   clearError() { this.error = ""; this.changed(); }
   reportError(error: unknown) { this.error = String(error); this.changed(); }
 
-  private add(name: string, raw: string, path: string | null, guide: boolean, kind = documentKind(name)) {
+  private add(name: string, raw: string, path: string | null, guide: boolean, kind = documentKind(name), initialMode: MarkdownMode = preferredMarkdownMode()) {
     const envelope = unpackMarkdown(raw);
     const unsupported = kind === "markdown" ? unsupportedMarkdown(envelope.body) : null;
     const tab: DocumentTab = {
       id: `document-${++this.sequence}`, draftId: crypto.randomUUID(), draftVersion: 0, protectedDraftVersion: -1, updatedAt: Date.now(), external: null, retainedPaths: [], name, path, resourceBase: path, raw, envelope, guide,
-      kind, mode: kind === 'text' || unsupported ? 'source' : 'document', authority: 'source',
+      kind, mode: kind === 'text' || unsupported || initialMode === 'source' ? 'source' : 'document', authority: 'source',
       source: null, sourceText: raw, richSource: raw, richBasis: '', richBasisText: raw, wrap: false,
       unsupported, editor: null, baseline: "",
-      dirty: false, reading: false, scrollTop: 0, status: "",
+      dirty: false, reading: kind === "markdown" && !unsupported && initialMode === "reading", scrollTop: 0, status: "",
     };
     this.attachEditor(tab);
     if (tab.mode === "source") this.attachSource(tab);
@@ -248,8 +247,11 @@ export class WorkspaceModel {
     return tab.source;
   }
   setMode(mode: 'document' | 'source', reading = false) {
-    const tab = this.active;
-    if (!tab || this.busy || this.closing || (tab.kind !== 'markdown' && mode !== 'source')) return false;
+    if (this.busy || this.closing) return false;
+    return this.applyMode(this.active, mode, reading);
+  }
+  private applyMode(tab: DocumentTab | null, mode: 'document' | 'source', reading = false) {
+    if (!tab || (tab.kind !== 'markdown' && mode !== 'source')) return false;
     if (mode === 'document' && tab.mode === 'document' && tab.editor) { tab.reading = reading; this.changed(); return true; }
     if (mode === 'source') {
       const content = this.markdown(tab);
@@ -275,6 +277,18 @@ export class WorkspaceModel {
     }
     this.error = ''; this.changed();
     requestAnimationFrame(() => { if (!this.disposed && this.activeId === tab.id && tab.mode === mode) { if (mode === 'source') tab.source?.focus(); else tab.editor?.commands.focus(undefined, { scrollIntoView: false }); } });
+    return true;
+  }
+  // One Markdown view preference applies to every tab. Unsupported syntax remains
+  // in source so a global view change cannot silently lose file contents.
+  selectMode(mode: MarkdownMode) {
+    if (this.active?.kind !== "markdown" || !this.setMode(mode === "source" ? "source" : "document", mode === "reading")) return false;
+    useSettings.getState().setMarkdownMode(mode);
+    for (const tab of this.tabs) {
+      if (tab === this.active || tab.kind !== "markdown") continue;
+      if (mode !== "source" && unsupportedMarkdown(unpackMarkdown(this.markdown(tab)).body)) continue;
+      this.applyMode(tab, mode === "source" ? "source" : "document", mode === "reading");
+    }
     return true;
   }
   setReading(reading: boolean) { this.setMode('document', reading); }
@@ -556,7 +570,7 @@ export class WorkspaceModel {
       const disk = await this.storage.authorizeDraft(id);
       if (this.disposed) return;
       const duplicate = draft.path && this.tabs.some(tab => tab.path === draft.path);
-      const tab = this.add(duplicate ? `${draft.name} · 恢复副本` : draft.name, draft.raw, duplicate ? null : draft.path, false, draft.kind ?? documentKind(draft.path ?? draft.name));
+      const tab = this.add(duplicate ? `${draft.name} · 恢复副本` : draft.name, draft.raw, duplicate ? null : draft.path, false, draft.kind ?? documentKind(draft.path ?? draft.name), draft.mode === "source" ? "source" : "document");
       tab.resourceBase = draft.resourceBase ?? draft.path; tab.envelope = unpackMarkdown(draft.content);
       tab.draftId = draft.id; tab.updatedAt = draft.updatedAt;
       tab.sourceText = draft.content; tab.authority = draft.authority ?? (draft.document ? 'rich' : 'source');
@@ -570,6 +584,8 @@ export class WorkspaceModel {
       if (tab.mode === 'source') { this.attachSource(tab); tab.source!.select(draft.selection); tab.source!.scrollTop = draft.sourceScrollTop ?? draft.scrollTop; }
       else { const editor = tab.editor as Editor | null; editor?.commands.setTextSelection(Math.min(Math.max(1, draft.selection), Math.max(1, editor.state.doc.content.size - 1))); }
       tab.draftVersion++; tab.dirty = true; tab.scrollTop = draft.scrollTop;
+      const preferred = preferredMarkdownMode();
+      if (tab.kind === "markdown" && (preferred === "source" || !tab.unsupported)) this.applyMode(tab, preferred === "source" ? "source" : "document", preferred === "reading");
       tab.status = "已恢复草稿，请检查后保存";
       if (!duplicate && disk && (disk.kind !== "present" || disk.content !== draft.raw)) tab.external = disk;
       this.pendingDrafts = this.pendingDrafts.filter(item => item.id !== id);

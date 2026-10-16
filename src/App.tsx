@@ -1,5 +1,6 @@
+import WorkspaceSidebar from "@/components/WorkspaceSidebar";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { App as InkApp, Button, ConfigProvider, Modal } from "paper-ink";
+import { App as InkApp, Button, ConfigProvider, Modal, Select } from "paper-ink";
 import { IconArrowBackUp, IconArrowForwardUp, IconArrowUpRight, IconBook2, IconChevronDown, IconCode, IconFolderOpen, IconLayoutSidebar, IconList, IconListCheck, IconListNumbers, IconMoon, IconPlus, IconQuote, IconFileText, IconSun, IconTable, IconTypography, IconBold, IconItalic, IconStrikethrough, IconRefresh, IconPhoto, IconX, IconSettings, IconSearch, IconHistory } from "paper-ink/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
@@ -22,11 +23,16 @@ import ResourceTools from "@/components/ResourceTools";
 import FileTree from "@/components/FileTree";
 import { desktopAvailable } from "@/lib/files";
 import { WorkspaceModel } from "@/workspace/model";
-import { useSettings } from "@/store/settings";
+import { useSettings, type MarkdownMode } from "@/store/settings";
 
 const guide = `# 从一页空白开始。\n\n把想法写下来，让文字回到文字。\n\neditor-minmd 是一个本地 Markdown 编辑器。打开你的文档，直接编辑排版后的内容，再保存回原来的文件。\n\n## 像写文档一样，写 Markdown\n\n不必来回切换编辑与预览。标题、列表、引用和代码，都在纸面上自然呈现。\n\n- 用 **粗体** 标出重点，用 *斜体* 留一点语气。\n- 输入 \`#\` 再按空格，开始一个标题。\n- 输入 \`-\` 再按空格，整理一份清单。\n\n> 简单的工具，留出更多思考的空间。\n\n## 留在本地，随时继续\n\n你的文档仍是普通的 Markdown 文件。不需要账号，也不需要上传。\n\n| 操作 | 快捷键 |\n| --- | --- |\n| 打开 Markdown | ⌘ / Ctrl + O |\n| 保存文档 | ⌘ / Ctrl + S |\n| 新建 MD | ⌘ / Ctrl + N |\n\n---\n\n点击右上角的「打开文件」，或新建一页，开始写作。\n`;
 const noopSubscribe = () => () => {};
 const zeroSnapshot = () => 0;
+const markdownModes = [
+  { value: "document" as const, label: <span className="mode-option"><IconTypography size={13} aria-hidden="true" />文档</span> },
+  { value: "reading" as const, label: <span className="mode-option"><IconBook2 size={13} aria-hidden="true" />阅读</span> },
+  { value: "source" as const, label: <span className="mode-option"><IconCode size={13} aria-hidden="true" />源码</span> },
+];
 const iconProps = { size: 17, stroke: 1.65 };
 
 export function Workspace({ workspace, background: suppliedBackground }: { workspace: WorkspaceModel; background?: BackgroundModel }) {
@@ -85,7 +91,7 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
       if (key === 'f') { commands.current.openSearch(); return; }
       const tab = workspace.active;
       if (!tab || tab.kind !== 'markdown') return;
-      const changed = key === '3' ? workspace.setMode('source') : workspace.setMode('document', key === '2');
+      const changed = workspace.selectMode(key === '3' ? 'source' : key === '2' ? 'reading' : 'document');
       if (changed) requestAnimationFrame(() => {
         if (workspace.active?.id !== tab.id) return;
         if (tab.mode === 'source') tab.source?.focus(); else tab.editor?.view.focus();
@@ -180,16 +186,16 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
         <button className={`rail-button ${backgroundOpen ? 'selected' : ''}`} aria-label="背景设置" aria-expanded={backgroundOpen} title={background.error ? '背景设置 · 需要处理' : '背景设置'} onClick={() => { if (backgroundOpen) void background.flush(); setBackgroundOpen(!backgroundOpen); }}><IconPhoto size={20} stroke={1.5} />{background.error && <i className="appearance-warning" />}</button>
         <button className="rail-button" aria-label={dark ? "切换浅色" : "切换深色"} title={dark ? "浅色纸面" : "深色墨纸"} onClick={toggleDark}>{dark ? <IconSun size={20} stroke={1.5} /> : <IconMoon size={20} stroke={1.5} />}</button>
       </nav>
-      {sidebar && <aside className="sidebar">
+      {sidebar && <WorkspaceSidebar>
         <div className="sidebar-heading sidebar-switch"><button className={pane === "files" ? "active" : ""} onClick={() => setPane("files")}>文件</button><button className={pane === "outline" ? "active" : ""} onClick={() => setPane("outline")}>大纲</button><span />{workspace.root && pane === "files" && <><button aria-label="刷新文件树" title="刷新文件树" disabled={busy} onClick={() => void workspace.refreshTree()}><IconRefresh size={13} /></button><button aria-label="关闭目录" title="关闭目录（保留已打开标签）" disabled={busy} onClick={() => void workspace.closeDirectory()}><IconX size={13} /></button></>}</div>
         {pane === "files" ? <div className="sidebar-scroll"><FileTree workspace={workspace} />
-        </div> : <div className="outline">{headings.length ? headings.map((heading) => <button key={heading.position} style={{ paddingLeft: 12 + Math.max(0, heading.level - 1) * 10 }} onClick={() => {
+        </div> : <div className="outline">{headings.length ? headings.map((heading) => <button key={heading.position} style={{ paddingLeft: 12 + Math.max(0, heading.level - 1) * 8 }} onClick={() => {
           const element = editor?.view.nodeDOM(heading.position); if (element instanceof HTMLElement) element.scrollIntoView({ behavior: "smooth", block: "start" });
         }} title={heading.text}><span className="heading-level">{heading.level === 1 ? "#" : "·"}</span><span>{heading.text}</span></button>) : <p className="outline-empty">写下标题，梳理思路。</p>}</div>}
-      </aside>}
+      </WorkspaceSidebar>}
       <main className="main">
         <div className="tabbar"><DocumentTabs workspace={workspace} onClose={(ids) => void closeTabs(ids)} />
-          {session && <>{session.mode === 'document' && <button className="quiet-button" aria-label="查找文档" title="查找 · ⌘/Ctrl F" disabled={busy || !!workspace.closing} onMouseDown={event => event.preventDefault()} onClick={openSearch}><IconSearch size={14} />查找</button>}{session.kind === 'markdown' && <div className="view-switch" aria-label="文档模式"><button className={session.mode === 'document' && !reading ? "active" : ""} onClick={() => workspace.setReading(false)} title="文档 · ⌘/Ctrl 1"><IconTypography size={13} />文档</button><button className={session.mode === 'document' && reading ? "active" : ""} onClick={() => workspace.setReading(true)} title="阅读 · ⌘/Ctrl 2"><IconBook2 size={13} />阅读</button><button className={session.mode === 'source' ? "active" : ""} onClick={() => workspace.setMode('source')} title="源码 · ⌘/Ctrl 3"><IconCode size={13} />源码</button></div>}<button className="quiet-button" title="另存为 · ⌘/Ctrl Shift S" disabled={busy || session.guide} onClick={() => void save(workspace.activeId, true)}>另存为<IconArrowUpRight size={13} /></button></>}
+          {session && <>{session.mode === 'document' && <button className="quiet-button" aria-label="查找文档" title="查找 · ⌘/Ctrl F" disabled={busy || !!workspace.closing} onMouseDown={event => event.preventDefault()} onClick={openSearch}><IconSearch size={14} />查找</button>}{session.kind === 'markdown' && <div className="view-switch"><Select<MarkdownMode> className="mode-select" size="small" aria-label="Markdown 模式" title="文档 ⌘/Ctrl 1 · 阅读 ⌘/Ctrl 2 · 源码 ⌘/Ctrl 3" showSearch={false} disabled={busy || !!workspace.closing} value={session.mode === 'source' ? 'source' : reading ? 'reading' : 'document'} options={markdownModes} onChange={mode => workspace.selectMode(mode)} /></div>}<button className="quiet-button" title="另存为 · ⌘/Ctrl Shift S" disabled={busy || session.guide} onClick={() => void save(workspace.activeId, true)}>另存为<IconArrowUpRight size={13} /></button></>}
 
           {workspace.tabs.length > 1 && <button className="quiet-button close-others" disabled={busy} title="关闭其他标签（未保存的会逐一确认）" onClick={() => void closeTabs(workspace.tabs.filter((tab) => tab.id !== workspace.activeId).map((tab) => tab.id))}>关闭其他</button>}
         </div>
