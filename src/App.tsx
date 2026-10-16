@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { App as InkApp, Button, ConfigProvider, Modal } from "paper-ink";
-import { IconArrowBackUp, IconArrowForwardUp, IconArrowUpRight, IconBook2, IconChevronDown, IconCode, IconFolderOpen, IconLayoutSidebar, IconList, IconListCheck, IconListNumbers, IconMoon, IconPlus, IconQuote, IconDeviceFloppy, IconSun, IconTable, IconTypography, IconBold, IconItalic, IconStrikethrough, IconRefresh, IconPhoto, IconX } from "paper-ink/icons";
+import { IconArrowBackUp, IconArrowForwardUp, IconArrowUpRight, IconBook2, IconChevronDown, IconCode, IconFolderOpen, IconLayoutSidebar, IconList, IconListCheck, IconListNumbers, IconMoon, IconPlus, IconQuote, IconDeviceFloppy, IconSun, IconTable, IconTypography, IconBold, IconItalic, IconStrikethrough, IconRefresh, IconPhoto, IconX, IconSettings } from "paper-ink/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
+import AssociationSettings from "@/components/AssociationSettings";
+import { connectExternalFiles } from "@/lib/externalFiles";
 import BackgroundSettings from "@/components/BackgroundSettings";
 import { BackgroundModel } from "@/lib/background";
 import SourceEditor from "@/components/SourceEditor";
@@ -23,6 +25,8 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
   const [background] = useState(() => suppliedBackground ?? new BackgroundModel());
   useSyncExternalStore(background.subscribe, background.snapshot);
   const [backgroundOpen, setBackgroundOpen] = useState(false);
+  const [associationsOpen, setAssociationsOpen] = useState(false);
+  const [associationBusy, setAssociationBusy] = useState(false);
   useEffect(() => { void background.load(); }, [background]);
   useSyncExternalStore(workspace.subscribe, workspace.snapshot);
   const { dark, sidebar, toggleDark, toggleSidebar } = useSettings();
@@ -31,7 +35,7 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
   const editor = session?.mode === "document" ? session.editor : null;
   const dirty = session?.dirty ?? false;
   const reading = session?.reading ?? false;
-  const busy = workspace.busy || background.busy;
+  const busy = workspace.busy || background.busy || associationBusy;
   const target = workspace.closeTarget;
   const editable = !!editor && !session?.guide && !reading && !busy;
   const ensureDesktop = () => {
@@ -51,7 +55,7 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
       if (!["n", "o", "s", "w", "tab"].includes(key)) return;
       if (desktopAvailable && key !== "tab") return;
       event.preventDefault();
-      if (workspace.busy || workspace.closing || background.busy) return;
+      if (workspace.busy || workspace.closing || background.busy || associationBusy) return;
       if (key === "n") workspace.create(event.shiftKey ? "text" : "markdown");
       if (key === "o") { if (event.shiftKey) void commands.current.chooseDirectory(); else if (desktopAvailable) void workspace.chooseFile(); else workspace.reportError("请在桌面窗口中打开文件。"); }
       if (key === "s") void commands.current.save(workspace.activeId, event.shiftKey);
@@ -65,7 +69,8 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
     window.addEventListener("keydown", keydown); window.addEventListener("beforeunload", unload);
     let off: (() => void) | undefined; let menuOff: (() => void) | undefined; let dropOff: (() => void) | undefined; let disposed = false;
     if (desktopAvailable) void listen<string>("workspace-command", ({ payload }) => {
-      if (workspace.busy || workspace.closing || background.busy) return;
+      if (workspace.busy || workspace.closing || background.busy || associationBusy) return;
+      if (payload === "associations") setAssociationsOpen(true);
       if (payload === "new") workspace.create();
       if (payload === "new-text") workspace.create("text");
       if (payload === "open") void workspace.chooseFile();
@@ -85,12 +90,12 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
       void workspace.insertImages(workspace.activeId!, undefined, payload.paths);
     }).then(unlisten => { if (disposed) unlisten(); else dropOff = unlisten; });
     if (desktopAvailable) void getCurrentWindow().onCloseRequested((event) => {
-      if (workspace.busy || workspace.closing || background.busy) { event.preventDefault(); return; }
+      if (workspace.busy || workspace.closing || background.busy || associationBusy) { event.preventDefault(); return; }
       event.preventDefault();
       void commands.current.closeTabs(workspace.tabs.map((tab) => tab.id), true);
     }).then((unlisten) => { if (disposed) unlisten(); else off = unlisten; });
     return () => { disposed = true; off?.(); menuOff?.(); dropOff?.(); window.removeEventListener("keydown", keydown); window.removeEventListener("beforeunload", unload); };
-  }, [workspace, background]);
+  }, [workspace, background, associationBusy]);
   useEffect(() => {
     if (desktopAvailable) void getCurrentWindow().setTitle(`${dirty ? "● " : ""}${session?.name ?? "MinMD"} — MinMD`).catch(() => {});
   }, [dirty, session?.name]);
@@ -129,6 +134,7 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
         <button className={sidebar ? "rail-button selected" : "rail-button"} aria-label="切换侧栏" title="文件与大纲" onClick={toggleSidebar}><IconLayoutSidebar size={21} stroke={1.5} /></button>
         <button className="rail-button" aria-label="新建 Markdown" title="新建 Markdown" disabled={busy} onClick={() => workspace.create()}><IconPlus size={21} stroke={1.5} /></button>
         <span className="rail-spacer" />
+        <button className="rail-button" aria-label="默认打开方式" title="默认打开方式" onClick={() => setAssociationsOpen(true)}><IconSettings size={20} stroke={1.5} /></button>
         <button className={`rail-button ${backgroundOpen ? 'selected' : ''}`} aria-label="背景设置" aria-expanded={backgroundOpen} title={background.error ? '背景设置 · 需要处理' : '背景设置'} onClick={() => { if (backgroundOpen) void background.flush(); setBackgroundOpen(!backgroundOpen); }}><IconPhoto size={20} stroke={1.5} />{background.error && <i className="appearance-warning" />}</button>
         <button className="rail-button" aria-label={dark ? "切换浅色" : "切换深色"} title={dark ? "浅色纸面" : "深色墨纸"} onClick={toggleDark}>{dark ? <IconSun size={20} stroke={1.5} /> : <IconMoon size={20} stroke={1.5} />}</button>
         <div className="rail-monogram">墨</div>
@@ -169,6 +175,7 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
     </div>
     <footer className="statusbar"><div><span className={`status-dot ${workspace.hasDirty ? "unsaved" : ""}`} />{busy ? "正在处理文件…" : workspace.error ? "操作未完成" : session?.guide ? "欢迎来到 MinMD" : dirty ? "当前文档有未保存的修改" : session?.status || (session?.path ? "已保存" : session ? "新文档，尚未保存" : "就绪")}{workspace.tabs.filter((tab) => tab.dirty).length > 0 && <span>共 {workspace.tabs.filter((tab) => tab.dirty).length} 份未保存</span>}</div><div>{!desktopAvailable && <span className="preview-label">浏览器预览</span>}<span>{wordCount.toLocaleString()} 字符</span><span>{session?.mode === "source" ? (session.source?.language && session.source.language !== "Plain Text" ? session.source.language : "纯文本") : "Markdown"}</span>{session?.mode === "source" && session.source && <span>行 {session.source.cursor.line}，列 {session.source.cursor.column}</span>}{workspace.recoveryReady && dirty && <span>{workspace.recoveryError ? "草稿保护失败" : session?.protectedDraftVersion === session?.draftVersion ? "草稿已保护" : "草稿保护中…"}</span>}<span>UTF-8{session?.envelope.bom && " BOM"}</span><span>{session?.envelope.newline === "\r\n" ? "CRLF" : "LF"}</span></div></footer>
 
+    {associationsOpen && <AssociationSettings onBusyChange={setAssociationBusy} onClose={() => setAssociationsOpen(false)} />}
     <Modal open={!!target} title="保存这页的修改？" onCancel={() => workspace.cancelClose()} footer={<div className="leave-actions"><Button disabled={busy} onClick={() => workspace.cancelClose()}>继续编辑</Button><Button disabled={busy} danger onClick={async () => { workspace.approveClose(); if (!workspace.closeTarget) await completeClose(); }}>不保存</Button><Button type="primary" disabled={busy} onClick={async () => { if (target && await save(target.id)) { workspace.approveClose(); if (!workspace.closeTarget) await completeClose(); } }}>保存并继续</Button></div>}><p>「{target?.name}」有未保存的修改。保存后再关闭，或放弃本次修改。</p>{(workspace.closing?.remaining.length ?? 0) > 1 && <p>还有 {workspace.closing!.remaining.length} 份文档需要确认。</p>}{workspace.error && <p role="alert" className="dialog-error">{workspace.error}</p>}</Modal>
   </div>;
 }
@@ -176,6 +183,7 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
 function WorkspaceRoot() {
   const [workspace, setWorkspace] = useState<WorkspaceModel | null>(null);
   useEffect(() => { const model = new WorkspaceModel(); model.addGuide(guide); setWorkspace(model); if (desktopAvailable) void model.startReliability(); return () => model.dispose(); }, []);
+  useEffect(() => { if (workspace && desktopAvailable) return connectExternalFiles(workspace); }, [workspace]);
   return workspace ? <Workspace workspace={workspace} /> : null;
 }
 

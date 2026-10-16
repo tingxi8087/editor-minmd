@@ -16,6 +16,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
                 true,
                 &[
                     &PredefinedMenuItem::about(app, Some("关于 MinMD"), None)?,
+                    &action("associations", "默认打开方式…", Some("CmdOrCtrl+,"))?,
                     #[cfg(target_os = "macos")]
                     &PredefinedMenuItem::services(app, Some("服务"))?,
                     #[cfg(target_os = "macos")]

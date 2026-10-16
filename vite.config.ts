@@ -4,6 +4,6 @@ import { fileURLToPath, URL } from "node:url";
 export default defineConfig({
   plugins: [react()],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
-  server: { port: 1537, strictPort: true, watch: { ignored: ["**/src-tauri/**"] } },
+  server: { port: 1537, strictPort: true, watch: { ignored: ["**/src-tauri/**", "**/build/**"] } },
   clearScreen: false,
 });

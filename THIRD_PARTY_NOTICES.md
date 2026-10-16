@@ -16,6 +16,7 @@
 | notify | CC0-1.0 | https://github.com/notify-rs/notify |
 | image | MIT OR Apache-2.0 | https://github.com/image-rs/image |
 | trash | MIT | https://github.com/Byron/trash-rs |
+| core-foundation | MIT OR Apache-2.0 | https://github.com/servo/core-foundation-rs |
 | libc | MIT OR Apache-2.0 | https://github.com/rust-lang/libc |
 | tempfile | MIT OR Apache-2.0 | https://github.com/Stebalien/tempfile |
 | base64 | MIT OR Apache-2.0 | https://github.com/marshallpierce/rust-base64 |

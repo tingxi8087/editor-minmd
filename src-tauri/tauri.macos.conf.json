@@ -1,0 +1,383 @@
+{
+  "bundle": {
+    "fileAssociations": [
+      {
+        "ext": [
+          "md"
+        ],
+        "name": "MD 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "net.daringfireball.markdown"
+        ]
+      },
+      {
+        "ext": [
+          "markdown"
+        ],
+        "name": "MARKDOWN 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "net.daringfireball.markdown"
+        ]
+      },
+      {
+        "ext": [
+          "txt"
+        ],
+        "name": "TXT 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "public.plain-text"
+        ]
+      },
+      {
+        "ext": [
+          "text"
+        ],
+        "name": "TEXT 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "public.plain-text"
+        ]
+      },
+      {
+        "ext": [
+          "json"
+        ],
+        "name": "JSON 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "public.json"
+        ]
+      },
+      {
+        "ext": [
+          "yaml"
+        ],
+        "name": "YAML 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "public.yaml"
+        ]
+      },
+      {
+        "ext": [
+          "yml"
+        ],
+        "name": "YML 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "public.yaml"
+        ]
+      },
+      {
+        "ext": [
+          "toml"
+        ],
+        "name": "TOML 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "exportedType": {
+          "identifier": "io.github.tingxi8087.editor-minmd.text.toml",
+          "conformsTo": [
+            "public.plain-text"
+          ]
+        }
+      },
+      {
+        "ext": [
+          "ini"
+        ],
+        "name": "INI 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "exportedType": {
+          "identifier": "io.github.tingxi8087.editor-minmd.text.ini",
+          "conformsTo": [
+            "public.plain-text"
+          ]
+        }
+      },
+      {
+        "ext": [
+          "xml"
+        ],
+        "name": "XML 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "public.xml"
+        ]
+      },
+      {
+        "ext": [
+          "csv"
+        ],
+        "name": "CSV 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "public.comma-separated-values-text"
+        ]
+      },
+      {
+        "ext": [
+          "log"
+        ],
+        "name": "LOG 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "com.apple.log"
+        ]
+      },
+      {
+        "ext": [
+          "js"
+        ],
+        "name": "JS 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "com.netscape.javascript-source"
+        ]
+      },
+      {
+        "ext": [
+          "jsx"
+        ],
+        "name": "JSX 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "exportedType": {
+          "identifier": "io.github.tingxi8087.editor-minmd.text.jsx",
+          "conformsTo": [
+            "public.plain-text"
+          ]
+        }
+      },
+      {
+        "ext": [
+          "tsx"
+        ],
+        "name": "TSX 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "exportedType": {
+          "identifier": "io.github.tingxi8087.editor-minmd.text.tsx",
+          "conformsTo": [
+            "public.plain-text"
+          ]
+        }
+      },
+      {
+        "ext": [
+          "html"
+        ],
+        "name": "HTML 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "public.html"
+        ]
+      },
+      {
+        "ext": [
+          "css"
+        ],
+        "name": "CSS 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "public.css"
+        ]
+      },
+      {
+        "ext": [
+          "scss"
+        ],
+        "name": "SCSS 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "exportedType": {
+          "identifier": "io.github.tingxi8087.editor-minmd.text.scss",
+          "conformsTo": [
+            "public.plain-text"
+          ]
+        }
+      },
+      {
+        "ext": [
+          "less"
+        ],
+        "name": "LESS 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "exportedType": {
+          "identifier": "io.github.tingxi8087.editor-minmd.text.less",
+          "conformsTo": [
+            "public.plain-text"
+          ]
+        }
+      },
+      {
+        "ext": [
+          "py"
+        ],
+        "name": "PY 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "public.python-script"
+        ]
+      },
+      {
+        "ext": [
+          "rs"
+        ],
+        "name": "RS 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "exportedType": {
+          "identifier": "io.github.tingxi8087.editor-minmd.text.rs",
+          "conformsTo": [
+            "public.plain-text"
+          ]
+        }
+      },
+      {
+        "ext": [
+          "go"
+        ],
+        "name": "GO 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "exportedType": {
+          "identifier": "io.github.tingxi8087.editor-minmd.text.go",
+          "conformsTo": [
+            "public.plain-text"
+          ]
+        }
+      },
+      {
+        "ext": [
+          "java"
+        ],
+        "name": "JAVA 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "com.sun.java-source"
+        ]
+      },
+      {
+        "ext": [
+          "c"
+        ],
+        "name": "C 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "public.c-source"
+        ]
+      },
+      {
+        "ext": [
+          "h"
+        ],
+        "name": "H 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "public.c-header"
+        ]
+      },
+      {
+        "ext": [
+          "cpp"
+        ],
+        "name": "CPP 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "public.c-plus-plus-source"
+        ]
+      },
+      {
+        "ext": [
+          "hpp"
+        ],
+        "name": "HPP 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "public.c-plus-plus-header"
+        ]
+      },
+      {
+        "ext": [
+          "sh"
+        ],
+        "name": "SH 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": [
+          "public.shell-script"
+        ]
+      },
+      {
+        "ext": [
+          "sql"
+        ],
+        "name": "SQL 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "exportedType": {
+          "identifier": "io.github.tingxi8087.editor-minmd.text.sql",
+          "conformsTo": [
+            "public.plain-text"
+          ]
+        }
+      },
+      {
+        "ext": [
+          "vue"
+        ],
+        "name": "VUE 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "exportedType": {
+          "identifier": "io.github.tingxi8087.editor-minmd.text.vue",
+          "conformsTo": [
+            "public.plain-text"
+          ]
+        }
+      },
+      {
+        "ext": [
+          "svelte"
+        ],
+        "name": "SVELTE 文本",
+        "role": "Editor",
+        "rank": "Alternate",
+        "exportedType": {
+          "identifier": "io.github.tingxi8087.editor-minmd.text.svelte",
+          "conformsTo": [
+            "public.plain-text"
+          ]
+        }
+      }
+    ],
+    "macOS": {
+      "infoPlist": "Info.plist"
+    }
+  }
+}

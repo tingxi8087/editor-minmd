@@ -13,6 +13,7 @@ MIT 开源的本地 Markdown 桌面编辑器。使用 Tauri 2、React、Tiptap�
 - [源码、文本与代码编辑](doc/source-editing.md)
 - [目录文件管理与界面中文化](doc/file-management.md)
 - [自定义背景与侧栏精简](doc/background.md)
+- [macOS 默认打开方式](doc/file-associations.md)
 - [待实现清单](doc/roadmap.md)
 
 ## 开发
@@ -21,19 +22,18 @@ MIT 开源的本地 Markdown 桌面编辑器。使用 Tauri 2、React、Tiptap�
 
 ```sh
 npm ci
-npm run desktop
-```
-
-`npm run dev` 仅启动浏览器界面预览（端口 1537），本地文件打开和保存需要 Tauri 桌面窗口。
-
-```sh
-npm run build
+npm run dev       # 启动 Tauri 桌面开发窗口
+npm run build     # 构建 release 桌面应用、安装包，并导出到 build/<版本>/<目标平台>/
 npm test
-cargo test --manifest-path src-tauri/Cargo.toml
-npm run tauri -- build
 ```
 
-macOS 本地调试应用包：`npm run tauri -- build --debug --bundles app`，产物位于 `src-tauri/target/debug/bundle/macos/MinMD.app`。该应用包是本地开发构建，尚未签名、公证。
+纯浏览器预览使用 `npm run dev:web`（端口 1537）；仅构建前端使用 `npm run build:web`。`npm run desktop` 保留为桌面开发别名。本地文件操作需要桌面窗口。
+
+版本只修改根目录 `package.json` 的 `version`。启动和构建自动同步 Cargo、npm 锁文件中的本项目版本；Tauri 直接读取该文件。无需分别手改版本号。
+
+当前 macOS Apple Silicon 产物示例：`build/0.1.0/aarch64-apple-darwin/`，含 `MinMD.app`、DMG、应用 ZIP 和 `build-info.json`。调试分发包可执行 `npm run build -- --debug --bundles app`，存到对应 `*-debug/` 子目录。`build/` 已忽略，不提交 Git。
+
+当前为本地构建，未做 Developer ID 签名和公证。完整脚本、目录与验证范围见[开发与桌面打包](doc/build.md)。
 
 ## 使用
 
@@ -44,6 +44,7 @@ macOS 本地调试应用包：`npm run tauri -- build --debug --bundles app`，�
 - 保存：⌘/Ctrl + S；另存为：⌘/Ctrl + Shift + S。
 - 输入 `# ` 创建标题、`- ` 创建列表、三个反引号加空格创建代码块。
 - 在「文档」中直接编辑；「阅读」模式关闭编辑；「源码」通过 CodeMirror 编辑 Markdown。普通文本、代码文件直接使用源码编辑器。
+- 左侧齿轮「默认打开方式」可选择文件类型并设为系统默认（macOS）；首次全选，记住勾选，执行后显示逐项结果。
 - 左侧底部「背景设置」选择本地 PNG/JPEG/WebP，调节模糊/遮罩并自动保存，可恢复默认；图片复制到本机应用数据目录。左侧只保留文件树/大纲，打开文件通过顶部标签切换。
 - 可用 `examples/纸墨试写.md` 体验标题、任务列表、引用、表格和代码高亮。
 
@@ -59,7 +60,7 @@ macOS 本地调试应用包：`npm run tauri -- build --debug --bundles app`，�
 - 本地图片预览、选择/粘贴/拖入图片，复制至文档旁 `assets/`；支持 PNG/JPEG/GIF/WebP，单张最多 20 MB。未保存文档先保存再插图。
 - 链接插入/修改/移除（⌘/Ctrl K），阅读时点击、编辑时 ⌘/Ctrl 点击打开网页或本地 Markdown；跨目录另存为会调整相对引用。详见 [图片与链接](doc/resources.md)。
 - 未保存正文自动写本地恢复快照，重启后逐份恢复；未编辑文件外部变化自动载入，脏文件提供对比/重新载入/另存副本。详见 [草稿恢复与外部修改](doc/reliability.md)。
-- 目录内新建、重命名和回收站删除已实现，有未保存子文件时阻止删除；详见[目录文件管理](doc/file-management.md)。自定义背景已支持，详见[背景与持久化](doc/background.md)。系统文件关联待后续实现。草稿不替代手动保存；强制退出仍可能丢失最近尚未落盘的输入。
+- 目录内新建、重命名和回收站删除已实现，有未保存子文件时阻止删除；详见[目录文件管理](doc/file-management.md)。自定义背景已支持，详见[背景与持久化](doc/background.md)。macOS 默认打开方式已支持分组勾选设置，访达打开会交给现有窗口；`.ts` 等非文本类型冲突会跳过并说明，详见[文件关联](doc/file-associations.md)。草稿不替代手动保存；强制退出仍可能丢失最近尚未落盘的输入。
 
 ## 项目结构
 

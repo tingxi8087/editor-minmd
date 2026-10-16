@@ -7,3 +7,4 @@ artifacts/
 *.tsbuildinfo
 src-tauri/gen/
 doc/images
+build/

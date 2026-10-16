@@ -1,3 +1,4 @@
+mod associations;
 mod background;
 mod menu;
 mod reliability;
@@ -229,6 +230,7 @@ pub fn run() {
     }));
     builder
         .manage(OpenedFiles::default())
+        .manage(associations::PendingFiles::default())
         .manage(reliability::RecoveryLock::default())
         .manage(reliability::DocumentWatcher::default())
         .manage(workspace::WorkspaceRoot::default())
@@ -237,6 +239,9 @@ pub fn run() {
         .on_menu_event(menu::dispatch)
         .manage(background::BackgroundIo::default())
         .invoke_handler(tauri::generate_handler![
+            associations::association_platform,
+            associations::set_default_associations,
+            associations::take_external_files,
             background::load_background,
             background::choose_background,
             background::set_background_options,
@@ -260,8 +265,19 @@ pub fn run() {
             workspace::rename_workspace_entry,
             workspace::trash_workspace_entry
         ])
-        .run(tauri::generate_context!())
-        .expect("无法启动 MinMD");
+        .build(tauri::generate_context!())
+        .expect("无法启动 MinMD")
+        .run(|app, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = event {
+                associations::enqueue(
+                    app,
+                    urls.into_iter().filter_map(|url| url.to_file_path().ok()),
+                );
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = (app, event);
+        });
 }
 
 #[cfg(test)]
