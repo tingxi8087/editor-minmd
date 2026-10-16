@@ -85,3 +85,5 @@ npm test
 项目源码按 [MIT](LICENSE) 发布。编辑交互参考 MinMD 文档编辑器；第三方依赖保持各自许可，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 代码块语言搜索、删除与表格行列/对齐/列宽操作见[交互说明](doc/block-interactions.md)。
+
+侧栏：⌘/Ctrl + B 收起/展开文件与大纲；该快捷键优先用于侧栏，粗体可用格式工具栏。

@@ -33,7 +33,7 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
   useEffect(() => { void background.load(); }, [background]);
   useSyncExternalStore(workspace.subscribe, workspace.snapshot);
   const { dark, sidebar, toggleDark, toggleSidebar } = useSettings();
-  const [pane, setPane] = useState<"files" | "outline">("files");
+  const [pane, setPane] = useState<"files" | "outline">("outline");
   const session = workspace.active;
   const editor = session?.mode === "document" ? session.editor : null;
   const dirty = session?.dirty ?? false;
@@ -52,6 +52,12 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
   const commands = useRef({ save, chooseDirectory, closeTabs });
   commands.current = { save, chooseDirectory, closeTabs };
   useEffect(() => {
+    // Capture before Tiptap handles Mod+B so the shortcut cannot also toggle bold.
+    const sidebarKeydown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.isComposing || event.key.toLowerCase() !== "b") return;
+      event.preventDefault(); event.stopPropagation();
+      if (!event.repeat) useSettings.getState().toggleSidebar();
+    };
     const keydown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
       const key = event.key.toLowerCase();
@@ -69,6 +75,7 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
       }
     };
     const unload = (event: BeforeUnloadEvent) => { if (workspace.hasDirty || workspace.busy) event.preventDefault(); };
+    window.addEventListener("keydown", sidebarKeydown, true);
     window.addEventListener("keydown", keydown); window.addEventListener("beforeunload", unload);
     let off: (() => void) | undefined; let menuOff: (() => void) | undefined; let dropOff: (() => void) | undefined; let disposed = false;
     if (desktopAvailable) void listen<string>("workspace-command", ({ payload }) => {
@@ -97,7 +104,7 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
       event.preventDefault();
       void commands.current.closeTabs(workspace.tabs.map((tab) => tab.id), true);
     }).then((unlisten) => { if (disposed) unlisten(); else off = unlisten; });
-    return () => { disposed = true; off?.(); menuOff?.(); dropOff?.(); window.removeEventListener("keydown", keydown); window.removeEventListener("beforeunload", unload); };
+    return () => { disposed = true; off?.(); menuOff?.(); dropOff?.(); window.removeEventListener("keydown", sidebarKeydown, true); window.removeEventListener("keydown", keydown); window.removeEventListener("beforeunload", unload); };
   }, [workspace, background, associationBusy]);
   useEffect(() => {
     if (desktopAvailable) void getCurrentWindow().setTitle(`${dirty ? "● " : ""}${session?.name ?? "MinMD"} — MinMD`).catch(() => {});
@@ -123,7 +130,6 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
     {background.image && <div className="workspace-background" aria-hidden="true"><img src={background.image.dataUrl} alt="" style={{ filter: `blur(${background.blur}px)` }} onError={() => { if (background.image) background.imageFailed(background.image.dataUrl); }} /><div style={{ opacity: background.mask / 100 }} /></div>}
     {backgroundOpen && <BackgroundSettings model={background} onClose={() => { void background.flush(); setBackgroundOpen(false); }} />}
     <header className="titlebar" data-tauri-drag-region>
-      <div className="brand"><span className="brand-mark">m<span>·</span></span><span>MinMD</span></div>
       <span className="window-title">{workspace.root?.name}{workspace.root && session && " / "}{session?.name}{dirty ? " · 未保存" : ""}</span>
       <div className="top-actions">
         <Button size="small" onClick={() => { if (ensureDesktop()) void workspace.chooseFile(); }} disabled={busy}>打开文件</Button>
@@ -132,7 +138,7 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
     </header>
     <div className="workbench">
       <nav className="activitybar" aria-label="工具栏">
-        <button className={sidebar ? "rail-button selected" : "rail-button"} aria-label="切换侧栏" title="文件与大纲" onClick={toggleSidebar}><IconLayoutSidebar size={21} stroke={1.5} /></button>
+        <button className={sidebar ? "rail-button selected" : "rail-button"} aria-label="切换侧栏" aria-expanded={sidebar} title="文件与大纲 · ⌘/Ctrl B" onClick={toggleSidebar}><IconLayoutSidebar size={21} stroke={1.5} /></button>
         <button className="rail-button" aria-label="新建 Markdown" title="新建 Markdown" disabled={busy} onClick={() => workspace.create()}><IconPlus size={21} stroke={1.5} /></button>
         <button className="rail-button" aria-label="新建文本" title="新建无后缀文本 · ⌘/Ctrl Shift N" disabled={busy} onClick={() => workspace.create("text")}><IconFileText size={21} stroke={1.5} /></button>
         <span className="rail-spacer" />
@@ -146,7 +152,6 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
         </div> : <div className="outline">{headings.length ? headings.map((heading) => <button key={heading.position} style={{ paddingLeft: 12 + Math.max(0, heading.level - 1) * 10 }} onClick={() => {
           const element = editor?.view.nodeDOM(heading.position); if (element instanceof HTMLElement) element.scrollIntoView({ behavior: "smooth", block: "start" });
         }} title={heading.text}><span className="heading-level">{heading.level === 1 ? "#" : "·"}</span><span>{heading.text}</span></button>) : <p className="outline-empty">写下标题，梳理思路。</p>}</div>}
-        <div className="sidebar-foot"><span className="local-dot" />本地文件 · 自由书写</div>
       </aside>}
       <main className="main">
         <div className="tabbar"><DocumentTabs workspace={workspace} onClose={(ids) => void closeTabs(ids)} />

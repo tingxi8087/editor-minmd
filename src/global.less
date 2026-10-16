@@ -12,12 +12,10 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--link, #5a7
   position: relative; isolation: isolate; overflow: hidden; height: 100dvh; min-width: 700px; display: flex; flex-direction: column; color: var(--ink); background: var(--paper); font-size: 13px;
   &.dark { --paper-rgb: 37, 39, 34; --desk-rgb: 31, 33, 29; --paper: #252722; --desk: #1f211d; --wash: #2e302a; --ink: #e4e4d9; --secondary: #a3a69a; --muted: #7c8173; --line: #3d4036; --selection: #3b4236; --link: #a2bdb3; color-scheme: dark; }
 }
-.titlebar { display: flex; flex: 0 0 40px; align-items: center; justify-content: space-between; padding: 0 12px; background: var(--desk); border-bottom: 1px solid var(--line); user-select: none; }
+.titlebar { position: relative; display: flex; flex: 0 0 40px; align-items: center; justify-content: space-between; padding: 0 12px; background: var(--desk); border-bottom: 1px solid var(--line); user-select: none; }
 .window-overlay .titlebar { padding-left: 84px; }
-.window-title { flex: 1; min-width: 0; padding: 0 16px; text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--secondary); font-size: 11px; pointer-events: none; }
-.brand { pointer-events: none; flex-shrink: 0; display: flex; align-items: center; gap: 7px; font-family: Georgia, "Songti SC", serif; font-size: 17px; letter-spacing: -.4px; }
-.brand-mark { font-size: 23px; font-weight: 700; line-height: 1; padding-bottom: 4px; span { color: var(--secondary); } }
-.top-actions { display: flex; gap: 6px; align-items: center; }
+.window-title { position: absolute; left: 50%; transform: translateX(-50%); max-width: calc(100% - 360px); text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--ink); font-size: 14px; font-weight: 500; pointer-events: none; }
+.top-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; }
 .workbench { display: flex; flex: 1; min-height: 0; }
 .activitybar { width: 38px; flex: 0 0 38px; border-right: 1px solid var(--line); background: var(--desk); display: flex; align-items: center; flex-direction: column; gap: 5px; padding: 8px 0; }
 .rail-button { position: relative; width: 29px; height: 29px; display: grid; place-items: center; border: 0; background: transparent; color: var(--secondary); border-radius: 5px; &:hover { background: var(--selection); color: var(--ink); } &.selected { background: var(--selection); color: var(--ink); } }
@@ -30,8 +28,6 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--link, #5a7
 .outline { overflow: auto; flex: 1; button { display: flex; gap: 10px; align-items: baseline; text-align: left; width: calc(100% - 6px); padding: 5px 10px; border: 0; background: none; color: var(--secondary); font-size: 12px; line-height: 1.4; > span:last-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; } &:hover { color: var(--ink); background: var(--selection); } } }
 .heading-level { font-family: Georgia, serif; color: var(--muted); font-size: 12px; }
 .outline-empty { color: var(--muted); font-size: 11px; padding: 0 20px; }
-.sidebar-foot { padding: 10px 12px; border-top: 1px solid var(--line); font-size: 10px; color: var(--secondary); line-height: 1.5; > span:last-child { display: block; margin: 4px 0 0 12px; font-size: 8px; letter-spacing: 1.2px; color: var(--muted); } }
-.local-dot { display: inline-block; width: 4px; height: 4px; border: 1px solid var(--secondary); border-radius: 100%; margin-right: 8px; vertical-align: 2px; }
 .main { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; position: relative; }
 .tabbar { height: 32px; flex: 0 0 32px; display: flex; background: var(--desk); border-bottom: 1px solid var(--line); }
 .document-tab { display: flex; align-items: center; gap: 7px; min-width: 130px; max-width: 340px; padding: 0 12px; font-size: 12px; background: var(--paper); border-right: 1px solid var(--line); position: relative; > span:not(.guide-badge) { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; } &::before { content: ""; position: absolute; top: 0; height: 2px; left: 0; right: 0; background: var(--ink); } svg { flex-shrink: 0; } }

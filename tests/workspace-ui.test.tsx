@@ -75,6 +75,26 @@ beforeEach(() => {
 afterEach(() => { cleanup(); mounted.forEach((model) => model.dispose()); mounted.length = 0; });
 
 describe('workspace UI integration', () => {
+  it('captures Command/Ctrl B for the sidebar without changing bold or document content', async () => {
+    const { model, user } = setup();
+    await user.click(screen.getByRole('button', { name: '新建 Markdown' }));
+    const editor = model.active!.editor!; const before = model.markdown(model.active!);
+    const toggle = screen.getByRole('button', { name: '切换侧栏' });
+    const initial = toggle.getAttribute('aria-expanded');
+    fireEvent.keyDown(editor.view.dom, { key: 'b', metaKey: true });
+    expect(toggle.getAttribute('aria-expanded')).not.toBe(initial);
+    fireEvent.keyDown(editor.view.dom, { key: 'b', metaKey: true, repeat: true });
+    expect(toggle.getAttribute('aria-expanded')).not.toBe(initial);
+    expect(editor.isActive('bold')).toBe(false); expect(model.markdown(model.active!)).toBe(before); expect(model.active!.dirty).toBe(false);
+    fireEvent.keyDown(editor.view.dom, { key: 'b', metaKey: true });
+    expect(toggle.getAttribute('aria-expanded')).toBe(initial);
+    await user.click(screen.getByRole('button', { name: '源码' }));
+    fireEvent.keyDown(screen.getByRole('textbox', { name: '源码编辑器' }), { key: 'b', ctrlKey: true });
+    expect(toggle.getAttribute('aria-expanded')).not.toBe(initial);
+    fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
+    expect(toggle.getAttribute('aria-expanded')).toBe(initial);
+    expect(model.markdown(model.active!)).toBe(before); expect(model.active!.dirty).toBe(false);
+  });
   it('opens slash date insertion from the real workbench and keeps one-step undo and source sync', async () => {
     const { model, user } = setup(); await user.click(screen.getByRole('button', { name: '新建 Markdown' }));
     const editor = model.active!.editor!;
