@@ -127,6 +127,8 @@ export const RichCodeBlock = CodeBlockLowlight.extend({
       const dismiss = (event: Event) => { if (!toolbar.contains(event.target as Node)) closeMenu(); };
       document.addEventListener('pointerdown', dismiss);
       toolbar.addEventListener('mousedown', event => { if (!(event.target instanceof HTMLInputElement)) event.preventDefault(); });
+      const revealSearch = () => { editingGraph = false; showingSource = true; visibility(); };
+      dom.addEventListener('document-search-reveal', revealSearch);
       graphView.addEventListener('click', () => { editingGraph = true; visibility(); graphView.focus(); });
       sourceView.addEventListener('click', () => { editingGraph = false; visibility(); editor.view.focus(); });
       sourceToggle.addEventListener('click', () => { showingSource = !showingSource; visibility(); });
@@ -162,7 +164,7 @@ export const RichCodeBlock = CodeBlockLowlight.extend({
         update(next) { if (next.type !== node.type) return false; const changed = next.textContent !== node.textContent || next.attrs.language !== node.attrs.language; if (next.attrs.language !== node.attrs.language) { editingGraph = false; showingSource = false; } node = next; if (changed) update(); else visibility(); return true; },
         stopEvent: event => toolbar.contains(event.target as Node) || preview.contains(event.target as Node),
         ignoreMutation: mutation => mutation.type === 'attributes' || (mutation.type !== 'selection' && !code.contains(mutation.target) && mutation.target !== code),
-        destroy() { disposed = true; generation++; clearTimeout(timer); clearTimeout(mounted); clearTimeout(copyTimer); observer?.disconnect(); modeObserver?.disconnect(); document.removeEventListener('pointerdown', dismiss); editor.off('transaction', onTransaction); },
+        destroy() { disposed = true; generation++; clearTimeout(timer); clearTimeout(mounted); clearTimeout(copyTimer); observer?.disconnect(); modeObserver?.disconnect(); dom.removeEventListener('document-search-reveal', revealSearch); document.removeEventListener('pointerdown', dismiss); editor.off('transaction', onTransaction); },
       };
     };
   },

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { App as InkApp, Button, ConfigProvider, Modal } from "paper-ink";
-import { IconArrowBackUp, IconArrowForwardUp, IconArrowUpRight, IconBook2, IconChevronDown, IconCode, IconFolderOpen, IconLayoutSidebar, IconList, IconListCheck, IconListNumbers, IconMoon, IconPlus, IconQuote, IconFileText, IconSun, IconTable, IconTypography, IconBold, IconItalic, IconStrikethrough, IconRefresh, IconPhoto, IconX, IconSettings } from "paper-ink/icons";
+import { IconArrowBackUp, IconArrowForwardUp, IconArrowUpRight, IconBook2, IconChevronDown, IconCode, IconFolderOpen, IconLayoutSidebar, IconList, IconListCheck, IconListNumbers, IconMoon, IconPlus, IconQuote, IconFileText, IconSun, IconTable, IconTypography, IconBold, IconItalic, IconStrikethrough, IconRefresh, IconPhoto, IconX, IconSettings, IconSearch } from "paper-ink/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import Settings from "@/components/Settings";
@@ -10,6 +10,7 @@ import { BackgroundModel } from "@/lib/background";
 import SourceEditor from "@/components/SourceEditor";
 import SourceToolbar from "@/components/SourceToolbar";
 import DocumentEditor from "@/components/DocumentEditor";
+import DocumentSearch from "@/components/DocumentSearch";
 import DocumentTabs from "@/components/DocumentTabs";
 import ReliabilityPanel from "@/components/ReliabilityPanel";
 import SlashMenu from "@/components/SlashMenu";
@@ -33,6 +34,8 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
   useEffect(() => { void background.load(); }, [background]);
   useSyncExternalStore(workspace.subscribe, workspace.snapshot);
   const { dark, sidebar, toggleDark, toggleSidebar } = useSettings();
+  const [findOpen, setFindOpen] = useState(false);
+  const [findRequest, setFindRequest] = useState(0);
   const [pane, setPane] = useState<"files" | "outline">("outline");
   const session = workspace.active;
   const editor = session?.mode === "document" ? session.editor : null;
@@ -49,14 +52,35 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
   const chooseDirectory = async () => { if (ensureDesktop()) { await workspace.chooseDirectory(); setPane("files"); if (!useSettings.getState().sidebar) useSettings.getState().toggleSidebar(); } };
   const completeClose = async () => { await background.flush(); if (await workspace.completeClose()) await getCurrentWindow().destroy(); };
   const closeTabs = async (ids: string[], window = false) => { workspace.requestClose(ids, window); if (workspace.closing && !workspace.closeTarget) await completeClose(); };
-  const commands = useRef({ save, chooseDirectory, closeTabs });
-  commands.current = { save, chooseDirectory, closeTabs };
+  const openSearch = () => {
+    const tab = workspace.active;
+    if (!tab || busy || workspace.closing) return;
+    if (tab.mode === 'source') tab.source?.search();
+    else { setFindOpen(true); setFindRequest(value => value + 1); }
+  };
+  const commands = useRef({ save, chooseDirectory, closeTabs, openSearch });
+  commands.current = { save, chooseDirectory, closeTabs, openSearch };
+  useEffect(() => { setFindOpen(false); }, [session?.id]);
+  useEffect(() => { if (session?.mode === 'source') setFindOpen(false); }, [session?.mode]);
   useEffect(() => {
-    // Capture before Tiptap handles Mod+B so the shortcut cannot also toggle bold.
+    // Run workbench shortcuts before editor formatting and browser defaults.
     const sidebarKeydown = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.isComposing || event.key.toLowerCase() !== "b") return;
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.isComposing) return;
+      const key = event.key.toLowerCase();
+      if (!['b', '1', '2', '3', 'f'].includes(key)) return;
+      if (document.querySelector('[role="dialog"], [aria-modal="true"]')) return;
       event.preventDefault(); event.stopPropagation();
-      if (!event.repeat) useSettings.getState().toggleSidebar();
+      if (event.repeat) return;
+      if (key === 'b') { useSettings.getState().toggleSidebar(); return; }
+      if (workspace.busy || workspace.closing || background.busy || associationBusy) return;
+      if (key === 'f') { commands.current.openSearch(); return; }
+      const tab = workspace.active;
+      if (!tab || tab.kind !== 'markdown') return;
+      const changed = key === '3' ? workspace.setMode('source') : workspace.setMode('document', key === '2');
+      if (changed) requestAnimationFrame(() => {
+        if (workspace.active?.id !== tab.id) return;
+        if (tab.mode === 'source') tab.source?.focus(); else tab.editor?.view.focus();
+      });
     };
     const keydown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
@@ -155,7 +179,7 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
       </aside>}
       <main className="main">
         <div className="tabbar"><DocumentTabs workspace={workspace} onClose={(ids) => void closeTabs(ids)} />
-          {session && <>{session.kind === 'markdown' && <div className="view-switch" aria-label="文档模式"><button className={session.mode === 'document' && !reading ? "active" : ""} onClick={() => workspace.setReading(false)}><IconTypography size={13} />文档</button><button className={session.mode === 'document' && reading ? "active" : ""} onClick={() => workspace.setReading(true)}><IconBook2 size={13} />阅读</button><button className={session.mode === 'source' ? "active" : ""} onClick={() => workspace.setMode('source')} title="编辑 Markdown 源码"><IconCode size={13} />源码</button></div>}<button className="quiet-button" title="另存为 · ⌘/Ctrl Shift S" disabled={busy || session.guide} onClick={() => void save(workspace.activeId, true)}>另存为<IconArrowUpRight size={13} /></button></>}
+          {session && <>{session.mode === 'document' && <button className="quiet-button" aria-label="查找文档" title="查找 · ⌘/Ctrl F" disabled={busy || !!workspace.closing} onMouseDown={event => event.preventDefault()} onClick={openSearch}><IconSearch size={14} />查找</button>}{session.kind === 'markdown' && <div className="view-switch" aria-label="文档模式"><button className={session.mode === 'document' && !reading ? "active" : ""} onClick={() => workspace.setReading(false)} title="文档 · ⌘/Ctrl 1"><IconTypography size={13} />文档</button><button className={session.mode === 'document' && reading ? "active" : ""} onClick={() => workspace.setReading(true)} title="阅读 · ⌘/Ctrl 2"><IconBook2 size={13} />阅读</button><button className={session.mode === 'source' ? "active" : ""} onClick={() => workspace.setMode('source')} title="源码 · ⌘/Ctrl 3"><IconCode size={13} />源码</button></div>}<button className="quiet-button" title="另存为 · ⌘/Ctrl Shift S" disabled={busy || session.guide} onClick={() => void save(workspace.activeId, true)}>另存为<IconArrowUpRight size={13} /></button></>}
 
           {workspace.tabs.length > 1 && <button className="quiet-button close-others" disabled={busy} title="关闭其他标签（未保存的会逐一确认）" onClick={() => void closeTabs(workspace.tabs.filter((tab) => tab.id !== workspace.activeId).map((tab) => tab.id))}>关闭其他</button>}
         </div>
@@ -168,6 +192,7 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
           <span className="toolbar-note">{session.guide ? "内置使用指南 · 只读" : "所见即所得"}</span>
         </div>}
         <SourceToolbar workspace={workspace} />
+        {findOpen && session?.mode === 'document' && <DocumentSearch key={session.id} editor={editor} readOnly={!editable || !!workspace.closing} openRequest={findRequest} onClose={() => setFindOpen(false)} />}
         <ReliabilityPanel workspace={workspace} />
         {workspace.error && <div className="error-banner" role="alert"><span>{workspace.error}</span><button onClick={() => workspace.clearError()} aria-label="关闭提示">×</button></div>}
         {workspace.tabs.map((tab) => <section key={tab.id} className="tab-panel" role="tabpanel" id={`panel-${tab.id}`} aria-labelledby={`tab-${tab.id}`} hidden={tab.id !== workspace.activeId}>

@@ -180,17 +180,6 @@
       },
       {
         "ext": [
-          "html"
-        ],
-        "name": "HTML 文本",
-        "role": "Editor",
-        "rank": "Alternate",
-        "contentTypes": [
-          "public.html"
-        ]
-      },
-      {
-        "ext": [
           "css"
         ],
         "name": "CSS 文本",

@@ -4,7 +4,7 @@ use tauri::{Emitter, Manager};
 
 pub const EXTENSIONS: &[&str] = &[
     "md", "markdown", "txt", "text", "json", "yaml", "yml", "toml", "ini", "xml", "csv", "log",
-    "js", "jsx", "ts", "tsx", "html", "css", "scss", "less", "py", "rs", "go", "java", "c", "h",
+    "js", "jsx", "ts", "tsx", "css", "scss", "less", "py", "rs", "go", "java", "c", "h",
     "cpp", "hpp", "sh", "sql", "vue", "svelte",
 ];
 #[derive(Default)]
@@ -218,6 +218,7 @@ mod tests {
     fn rejects_empty_or_unlisted_types() {
         assert!(validate(&[]).is_err());
         assert!(validate(&["exe".into()]).is_err());
+        assert!(validate(&["html".into()]).is_err());
         assert!(validate(&["md".into(), "txt".into()]).is_ok());
     }
 }

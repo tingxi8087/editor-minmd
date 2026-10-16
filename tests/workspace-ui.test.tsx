@@ -75,6 +75,66 @@ beforeEach(() => {
 afterEach(() => { cleanup(); mounted.forEach((model) => model.dispose()); mounted.length = 0; });
 
 describe('workspace UI integration', () => {
+  it('switches Markdown modes with Command 1/2/3 while protecting dialogs and ordinary text', async () => {
+    const { model, user } = setup();
+    act(() => { model.openFile({ path: '/notes/modes.md', name: 'modes.md', content: '# 标题\n\n正文\n' }); });
+    const raw = model.markdown(model.active!);
+    await waitFor(() => expect((screen.getByRole('button', { name: '查找文档' }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.keyDown(window, { key: '2', metaKey: true });
+    expect(model.active!.reading).toBe(true); expect(model.active!.editor!.isEditable).toBe(false);
+    fireEvent.keyDown(window, { key: '3', metaKey: true });
+    expect(model.active!.mode).toBe('source');
+    fireEvent.keyDown(window, { key: '1', metaKey: true });
+    expect(model.active!.mode).toBe('document'); expect(model.active!.reading).toBe(false); expect(model.active!.editor!.isEditable).toBe(true);
+    expect(model.markdown(model.active!)).toBe(raw); expect(model.active!.dirty).toBe(false);
+    await user.click(screen.getByRole('button', { name: '设置' }));
+    fireEvent.keyDown(window, { key: '3', metaKey: true }); expect(model.active!.mode).toBe('document');
+    await user.click(within(screen.getByRole('dialog')).getAllByRole('button', { name: '关闭' }).at(-1)!);
+    await user.click(screen.getByRole('button', { name: '新建文本' }));
+    fireEvent.keyDown(window, { key: '1', metaKey: true }); expect(model.active!.mode).toBe('source');
+  });
+  it('finds across formatting and replaces through the real document bar, while reading mode remains read-only', async () => {
+    const { model, user } = setup();
+    act(() => { model.openFile({ path: '/notes/find.md', name: 'find.md', content: '# 查找\n\n你**好**，你好\n' }); });
+    const raw = model.markdown(model.active!);
+    await waitFor(() => expect((screen.getByRole('button', { name: '查找文档' }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.keyDown(model.active!.editor!.view.dom, { key: 'f', metaKey: true });
+    await user.type(screen.getByRole('textbox', { name: '查找内容' }), '你好');
+    expect(screen.getByRole('region', { name: '文档查找' }).textContent).toContain('1 / 2');
+    expect(document.querySelectorAll('.document-search-match')).toHaveLength(3);
+    expect(model.markdown(model.active!)).toBe(raw); expect(model.active!.dirty).toBe(false);
+    await user.click(screen.getByRole('button', { name: '展开替换' }));
+    await user.type(screen.getByRole('textbox', { name: '替换内容' }), '完成');
+    await user.click(screen.getByRole('button', { name: '全部替换' }));
+    expect(model.markdown(model.active!)).toContain('完成'); expect(model.active!.dirty).toBe(true);
+    act(() => { model.active!.editor!.commands.undo(); });
+    expect(model.markdown(model.active!)).toBe(raw); expect(model.active!.dirty).toBe(false);
+    fireEvent.keyDown(window, { key: '2', metaKey: true });
+    expect(screen.queryByRole('textbox', { name: '替换内容' })).toBeNull(); expect(screen.queryByRole('button', { name: '展开替换' })).toBeNull();
+    expect(screen.getByRole('textbox', { name: '查找内容' })).toBeTruthy();
+    expect(model.active!.editor!.isEditable).toBe(false);
+    fireEvent.keyDown(screen.getByRole('textbox', { name: '查找内容' }), { key: 'Escape' });
+    expect(screen.queryByRole('region', { name: '文档查找' })).toBeNull(); expect(document.querySelector('.document-search-match')).toBeNull();
+    expect(model.active!.dirty).toBe(false);
+    fireEvent.keyDown(window, { key: '3', metaKey: true });
+    fireEvent.keyDown(screen.getByRole('textbox', { name: '源码编辑器' }), { key: 'f', metaKey: true });
+    expect(document.querySelector('.cm-search')).toBeTruthy();
+  });
+  it('cleans up document search on tab changes and keeps unsupported Markdown in source mode', async () => {
+    const { model, user } = setup();
+    act(() => { model.openFile({ path: '/notes/a.md', name: 'a.md', content: 'Alpha Alpha\n' }); });
+    await user.click(screen.getByRole('button', { name: '查找文档' }));
+    await user.type(screen.getByRole('textbox', { name: '查找内容' }), 'Alpha');
+    const a = model.active!;
+    expect(document.querySelector('.document-search-match')).toBeTruthy();
+    act(() => { model.openFile({ path: '/notes/b.md', name: 'b.md', content: 'Beta\n' }); });
+    expect(screen.queryByRole('textbox', { name: '查找内容' })).toBeNull();
+    expect(a.editor!.view.dom.querySelector('.document-search-match')).toBeNull(); expect(a.dirty).toBe(false);
+    act(() => { model.openFile({ path: '/notes/raw.md', name: 'raw.md', content: '<!-- 原样保留 -->\n' }); });
+    fireEvent.keyDown(window, { key: '1', metaKey: true }); expect(model.active!.mode).toBe('source');
+    fireEvent.keyDown(window, { key: '2', metaKey: true }); expect(model.active!.mode).toBe('source');
+    expect(model.markdown(model.active!)).toBe('<!-- 原样保留 -->\n'); expect(model.active!.dirty).toBe(false);
+  });
   it('captures Command/Ctrl B for the sidebar without changing bold or document content', async () => {
     const { model, user } = setup();
     await user.click(screen.getByRole('button', { name: '新建 Markdown' }));

@@ -94,3 +94,36 @@ it('treats the browser preview as unsupported without invoking a native bridge',
   const { associations } = await import('../src/lib/associations');
   await expect(associations.supported()).resolves.toBe(false);
 });
+
+it('documents shortcuts in a separate tab without applying or changing file selections', async () => {
+  const { user, gateway } = setup();
+  await waitFor(() => expect((screen.getByRole('button', { name: '取消全选' }) as HTMLButtonElement).disabled).toBe(false));
+  await user.click(screen.getByRole('button', { name: '取消全选' }));
+  await user.click(screen.getByRole('checkbox', { name: '.md' }));
+  const stored = localStorage.getItem('minmd-file-associations-v1');
+  await user.click(screen.getByRole('tab', { name: '快捷键' }));
+  expect(screen.getByRole('tab', { name: '快捷键' }).getAttribute('aria-selected')).toBe('true');
+  const panel = screen.getByRole('tabpanel');
+  expect(within(panel).getByRole('rowheader', { name: '文档模式' }).parentElement?.textContent).toContain('⌘ / Ctrl + 1');
+  expect(within(panel).getByRole('rowheader', { name: '阅读模式' }).parentElement?.textContent).toContain('⌘ / Ctrl + 2');
+  expect(within(panel).getByRole('rowheader', { name: '源码模式' }).parentElement?.textContent).toContain('⌘ / Ctrl + 3');
+  expect(within(panel).getByRole('rowheader', { name: '收起 / 展开文件与大纲' }).parentElement?.textContent).toContain('⌘ / Ctrl + B');
+  expect(within(panel).getByText(/阅读模式仅支持查找/)).toBeTruthy();
+  expect(within(panel).getByRole('rowheader', { name: '打开设置（桌面）' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '设为默认打开应用' })).toBeNull();
+  expect(gateway.apply).not.toHaveBeenCalled();
+  expect(localStorage.getItem('minmd-file-associations-v1')).toBe(stored);
+  await user.click(screen.getByRole('tab', { name: '默认打开方式' }));
+  expect(screen.getByText('已选择 1 种扩展名')).toBeTruthy();
+  expect((screen.getByRole('checkbox', { name: '.md' }) as HTMLInputElement).checked).toBe(true);
+});
+
+it('filters a previously selected HTML extension from settings and native requests', async () => {
+  localStorage.setItem('minmd-file-associations-v1', JSON.stringify(['html', 'md']));
+  const { user, gateway } = setup();
+  expect(associationExtensions).not.toContain('html');
+  expect(screen.getByText('已选择 1 种扩展名')).toBeTruthy();
+  await waitFor(() => expect((screen.getByRole('button', { name: '设为默认打开应用' }) as HTMLButtonElement).disabled).toBe(false));
+  await user.click(screen.getByRole('button', { name: '设为默认打开应用' }));
+  expect(gateway.apply).toHaveBeenCalledWith(['md']);
+});
