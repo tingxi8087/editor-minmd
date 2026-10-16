@@ -135,6 +135,9 @@ export class WorkspaceModel {
         },
         onSelectionUpdate: () => this.changed(),
       });
+      // Normalize structural plugins before taking the clean snapshot. Otherwise
+      // opening a table menu can append the trailing paragraph and dirty a saved file.
+      tab.editor.view.dispatch(tab.editor.state.tr.setMeta("preventUpdate", true).setMeta("addToHistory", false));
       tab.baseline = JSON.stringify(tab.editor.getJSON());
       tab.richBasis = tab.baseline; tab.richBasisText = tab.sourceText; tab.richSource = tab.sourceText;
     }

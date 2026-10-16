@@ -115,7 +115,7 @@ describe('workspace UI integration', () => {
     await user.click(screen.getByRole('tab', { name: /A.md/ }));
     expect(screen.getByRole('tabpanel').textContent).toContain('只属于A');
     expect(model.tabs).toHaveLength(3);
-    await user.click(screen.getByRole('button', { name: '保存' }));
+    await act(async () => { platform.menu?.({ payload: 'save' }); });
     await waitFor(() => expect(model.active!.dirty).toBe(false));
     expect(gateway.saveDocument.mock.calls[0][1]).toContain('只属于A');
     await user.click(screen.getByRole('button', { name: '关闭目录' }));
@@ -277,7 +277,7 @@ describe('workspace UI integration', () => {
     await user.click(screen.getByRole('button', { name: '文档' }));
     expect(screen.getByRole('tabpanel').textContent).toContain('源码补充');
     await user.click(screen.getByRole('button', { name: '源码' }));
-    await user.click(screen.getByRole('button', { name: '保存' }));
+    await act(async () => { platform.menu?.({ payload: 'save' }); });
     expect(gateway.saveDocument.mock.calls[0][1]).toContain('源码补充'); expect(model.active!.dirty).toBe(false);
   });
   it('opens code with real line gutters/highlight spans and wires undo, language and wrap controls', async () => {

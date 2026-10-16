@@ -1,0 +1,16 @@
+.tiptap .table-quick-wrapper {
+  position: relative; margin: 12px 0 18px; padding: 0 18px 18px 0;
+  .tableWrapper { overflow-x: auto; overscroll-behavior: none; }
+  table { margin: 0; }
+  .table-append { position: absolute; border: 1px solid var(--line); color: var(--secondary); background: var(--paper, #fffefb); border-radius: 3px; font-size: 16px; line-height: 14px; padding: 0; cursor: pointer; opacity: 0; transition: opacity .12s; }
+  .table-append-column { top: 0; right: 0; width: 16px; height: calc(100% - 18px); }
+  .table-append-row { bottom: 0; left: 0; width: calc(100% - 18px); height: 16px; }
+  &:hover .table-append, &:focus-within .table-append { opacity: 1; }
+  .table-append:hover, .table-append:focus-visible { background: var(--wash); color: var(--ink); outline: 1px solid var(--muted); }
+  &[data-editable="false"] { padding: 0; }
+  &[data-editable="false"] .table-append { display: none; }
+  .table-delete-preview { background: color-mix(in srgb, #b44d48 17%, var(--paper, #fffefb)) !important; box-shadow: inset 0 0 0 1px color-mix(in srgb, #b44d48 45%, transparent); }
+  .column-resize-handle { position: absolute; right: -2px; top: 0; bottom: -2px; width: 4px; background: var(--muted); pointer-events: none; }
+  &[data-editable="false"] .column-resize-handle { display: none; }
+}
+.tiptap.resize-cursor { cursor: col-resize; }

@@ -31,6 +31,15 @@ const edit = (model: WorkspaceModel, id: string, text: string) => {
 afterEach(() => { models.forEach((model) => model.dispose()); models.length = 0; });
 
 describe('multiple document sessions', () => {
+  it('keeps a saved document ending in a code block clean during selection-only controls', () => {
+    const { model } = setup();
+    const raw = '| A | B |\n| --- | --- |\n| x | y |\n\n```js\nconst n = 1;\n```\n';
+    const tab = model.openFile(file('blocks', raw));
+    tab.editor!.commands.setTextSelection(4);
+    expect(tab.dirty).toBe(false);
+    expect(model.markdown(tab)).toBe(raw);
+    expect(tab.editor!.can().undo()).toBe(false);
+  });
   it('retains contents, selections, scroll, reading mode and independent undo/redo', () => {
     const { model } = setup(); const a = model.openFile(file('A')); edit(model, a.id, '编辑A');
     a.editor!.commands.setTextSelection(2); a.scrollTop = 120; model.setReading(true);

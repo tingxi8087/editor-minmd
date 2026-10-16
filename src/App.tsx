@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { App as InkApp, Button, ConfigProvider, Modal } from "paper-ink";
-import { IconArrowBackUp, IconArrowForwardUp, IconArrowUpRight, IconBook2, IconChevronDown, IconCode, IconFolderOpen, IconLayoutSidebar, IconList, IconListCheck, IconListNumbers, IconMoon, IconPlus, IconQuote, IconDeviceFloppy, IconSun, IconTable, IconTypography, IconBold, IconItalic, IconStrikethrough, IconRefresh, IconPhoto, IconX, IconSettings } from "paper-ink/icons";
+import { IconArrowBackUp, IconArrowForwardUp, IconArrowUpRight, IconBook2, IconChevronDown, IconCode, IconFolderOpen, IconLayoutSidebar, IconList, IconListCheck, IconListNumbers, IconMoon, IconPlus, IconQuote, IconFileText, IconSun, IconTable, IconTypography, IconBold, IconItalic, IconStrikethrough, IconRefresh, IconPhoto, IconX, IconSettings } from "paper-ink/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import AssociationSettings from "@/components/AssociationSettings";
@@ -126,21 +126,19 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
       <div className="brand"><span className="brand-mark">m<span>·</span></span><span>MinMD</span></div>
       <span className="window-title">{workspace.root?.name}{workspace.root && session && " / "}{session?.name}{dirty ? " · 未保存" : ""}</span>
       <div className="top-actions">
-        <Button type="text" size="small" title="新建无后缀文本 · ⌘/Ctrl Shift N" onClick={() => workspace.create("text")} disabled={busy}>新建文本</Button>
-        <Button size="small" title="打开目录 · ⌘/Ctrl Shift O" icon={<IconFolderOpen {...iconProps} />} onClick={() => void chooseDirectory()} disabled={busy}>打开目录</Button>
         <Button size="small" onClick={() => { if (ensureDesktop()) void workspace.chooseFile(); }} disabled={busy}>打开文件</Button>
-        <Button type="primary" size="small" icon={<IconDeviceFloppy {...iconProps} />} onClick={() => void save()} disabled={busy || !session || session.guide}>{busy ? "处理中…" : "保存"}</Button>
+        <Button size="small" title="打开目录 · ⌘/Ctrl Shift O" icon={<IconFolderOpen {...iconProps} />} onClick={() => void chooseDirectory()} disabled={busy}>打开目录</Button>
       </div>
     </header>
     <div className="workbench">
       <nav className="activitybar" aria-label="工具栏">
         <button className={sidebar ? "rail-button selected" : "rail-button"} aria-label="切换侧栏" title="文件与大纲" onClick={toggleSidebar}><IconLayoutSidebar size={21} stroke={1.5} /></button>
         <button className="rail-button" aria-label="新建 Markdown" title="新建 Markdown" disabled={busy} onClick={() => workspace.create()}><IconPlus size={21} stroke={1.5} /></button>
+        <button className="rail-button" aria-label="新建文本" title="新建无后缀文本 · ⌘/Ctrl Shift N" disabled={busy} onClick={() => workspace.create("text")}><IconFileText size={21} stroke={1.5} /></button>
         <span className="rail-spacer" />
         <button className="rail-button" aria-label="默认打开方式" title="默认打开方式" onClick={() => setAssociationsOpen(true)}><IconSettings size={20} stroke={1.5} /></button>
         <button className={`rail-button ${backgroundOpen ? 'selected' : ''}`} aria-label="背景设置" aria-expanded={backgroundOpen} title={background.error ? '背景设置 · 需要处理' : '背景设置'} onClick={() => { if (backgroundOpen) void background.flush(); setBackgroundOpen(!backgroundOpen); }}><IconPhoto size={20} stroke={1.5} />{background.error && <i className="appearance-warning" />}</button>
         <button className="rail-button" aria-label={dark ? "切换浅色" : "切换深色"} title={dark ? "浅色纸面" : "深色墨纸"} onClick={toggleDark}>{dark ? <IconSun size={20} stroke={1.5} /> : <IconMoon size={20} stroke={1.5} />}</button>
-        <div className="rail-monogram">墨</div>
       </nav>
       {sidebar && <aside className="sidebar">
         <div className="sidebar-heading sidebar-switch"><button className={pane === "files" ? "active" : ""} onClick={() => setPane("files")}>文件</button><button className={pane === "outline" ? "active" : ""} onClick={() => setPane("outline")}>大纲</button><span />{workspace.root && pane === "files" && <><button aria-label="刷新文件树" title="刷新文件树" disabled={busy} onClick={() => void workspace.refreshTree()}><IconRefresh size={13} /></button><button aria-label="关闭目录" title="关闭目录（保留已打开标签）" disabled={busy} onClick={() => void workspace.closeDirectory()}><IconX size={13} /></button></>}</div>
@@ -176,7 +174,7 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
         {!session && <div className="empty-workbench"><IconBook2 size={32} stroke={1} /><p>留一页，给新的想法。</p><Button onClick={() => workspace.create()}>新建 MD</Button></div>}
       </main>
     </div>
-    <footer className="statusbar"><div><span className={`status-dot ${workspace.hasDirty ? "unsaved" : ""}`} />{busy ? "正在处理文件…" : workspace.error ? "操作未完成" : session?.guide ? "欢迎来到 MinMD" : dirty ? "当前文档有未保存的修改" : session?.status || (session?.path ? "已保存" : session ? "新文档，尚未保存" : "就绪")}{workspace.tabs.filter((tab) => tab.dirty).length > 0 && <span>共 {workspace.tabs.filter((tab) => tab.dirty).length} 份未保存</span>}</div><div>{!desktopAvailable && <span className="preview-label">浏览器预览</span>}<span>{wordCount.toLocaleString()} 字符</span><span>{session?.mode === "source" ? (session.source?.language && session.source.language !== "Plain Text" ? session.source.language : "纯文本") : "Markdown"}</span>{session?.mode === "source" && session.source && <span>行 {session.source.cursor.line}，列 {session.source.cursor.column}</span>}{workspace.recoveryReady && dirty && <span>{workspace.recoveryError ? "草稿保护失败" : session?.protectedDraftVersion === session?.draftVersion ? "草稿已保护" : "草稿保护中…"}</span>}<span>UTF-8{session?.envelope.bom && " BOM"}</span><span>{session?.envelope.newline === "\r\n" ? "CRLF" : "LF"}</span></div></footer>
+    <footer className="statusbar"><div>{!desktopAvailable && <span className="preview-label">浏览器预览</span>}<span>{wordCount.toLocaleString()} 字符</span><span>{session?.mode === "source" ? (session.source?.language && session.source.language !== "Plain Text" ? session.source.language : "纯文本") : "Markdown"}</span>{session?.mode === "source" && session.source && <span>行 {session.source.cursor.line}，列 {session.source.cursor.column}</span>}{workspace.recoveryReady && dirty && <span>{workspace.recoveryError ? "草稿保护失败" : session?.protectedDraftVersion === session?.draftVersion ? "草稿已保护" : "草稿保护中…"}</span>}<span>UTF-8{session?.envelope.bom && " BOM"}</span><span>{session?.envelope.newline === "\r\n" ? "CRLF" : "LF"}</span></div></footer>
 
     {session?.mode === 'document' && <SlashMenu key={session.id} editor={editor} onInsert={(kind, range) => {
       if (kind === 'image') void workspace.insertImages(session.id, undefined, undefined, range);
