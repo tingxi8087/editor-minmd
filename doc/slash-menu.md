@@ -46,6 +46,6 @@ Mermaid 按需加载，图形在本机生成，无远程图表服务。使用 st
 
 ## 范围
 
-高亮块、折叠块按本轮要求排除。表格的 `/` 插入入口、行列管理与对齐均已提供，详见[代码块与表格交互](block-interactions.md)；文档模式查找已完成，见[查找说明](document-search.md)；最近文件与工作区恢复继续独立推进。没有宣称 Mermaid 的所有图种、复杂大图与跨平台 WebView 均已实机验收。
+高亮块、折叠块按本轮要求排除。表格的 `/` 插入入口、行列管理与对齐均已提供，详见[代码块与表格交互](block-interactions.md)；文档模式查找已完成，见[查找说明](document-search.md)；最近文件与[工作区恢复](workspace-session.md)现已完成。没有宣称 Mermaid 的所有图种、复杂大图与跨平台 WebView 均已实机验收。
 
 源码：[菜单](../src/components/SlashMenu/index.tsx)、[插入选择](../src/components/SlashInsert/index.tsx)、[代码块](../src/components/DocumentEditor/codeBlock.ts)、[渲染器](../src/components/DocumentEditor/mermaidRenderer.ts)、[本地引用](../src-tauri/src/resources.rs)。

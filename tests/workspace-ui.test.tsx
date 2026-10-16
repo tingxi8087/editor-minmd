@@ -3,6 +3,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App as InkApp, ConfigProvider } from "paper-ink";
+import type { WorkspaceSessionGateway } from "../src/lib/workspaceSession";
+import { RecentModel, type RecentGateway } from "../src/lib/recents";
 import { Workspace } from "../src/App";
 import { BackgroundModel, type BackgroundGateway } from "../src/lib/background";
 import { WorkspaceModel } from "../src/workspace/model";
@@ -29,7 +31,7 @@ vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => ({
 }) }));
 
 const entry = (path: string, isDirectory = false, isMarkdown = !isDirectory): DirectoryEntry => ({ path, name: path.split('/').pop()!, isDirectory, isMarkdown, isSymlink: false });
-const fixture = () => {
+const fixture = (recent?: RecentModel, session?: WorkspaceSessionGateway) => {
   const gateway = {
     loadImage: vi.fn<FileGateway['loadImage']>().mockResolvedValue('data:image/png;base64,iVBORw0KGgo='),
     importImage: vi.fn<FileGateway['importImage']>().mockResolvedValue({ reference: 'assets/image.png', name: '粘贴图片' }),
@@ -53,7 +55,7 @@ const fixture = () => {
     watchDocuments: vi.fn<ReliabilityGateway['watchDocuments']>().mockResolvedValue(undefined),
     onDiskChange: vi.fn<ReliabilityGateway['onDiskChange']>().mockResolvedValue(() => {}),
   };
-  const model = new WorkspaceModel(gateway, storage);
+  const model = new WorkspaceModel(gateway, storage, recent, session);
   model.addGuide('# 使用指南\n\n欢迎');
   const backgroundGateway = {
     load: vi.fn<BackgroundGateway['load']>().mockResolvedValue({ image: null, blur: 6, mask: 30 }),
@@ -496,4 +498,31 @@ describe('workspace UI integration', () => {
     await act(async () => { finish(); await background.flush(); }); await waitFor(() => expect(platform.destroy).toHaveBeenCalledTimes(1));
   });
 
+});
+
+it('opens recent directories through the compact header and retains missing records for removal', async () => {
+  const entries = { files: [{ path: '/gone.md', name: 'gone.md' }], directories: [{ path: '/old', name: 'old' }] };
+  const history = { load: vi.fn().mockResolvedValue(entries), record: vi.fn().mockResolvedValue(entries), remove: vi.fn().mockResolvedValue({ ...entries, files: [] }), clear: vi.fn().mockResolvedValue({ files: [], directories: [] }), openFile: vi.fn().mockRejectedValue('文件不存在'), openDirectory: vi.fn().mockResolvedValue({ path: '/old', name: 'old', entries: [] }) } satisfies RecentGateway;
+  const recent = new RecentModel(history); const { model, user } = fixture(recent); mounted.push(model);
+  await user.click(screen.getByRole('button', { name: '最近打开' }));
+  await user.click(await screen.findByRole('button', { name: '打开文件 gone.md' }));
+  expect(await screen.findByRole('alert')).toHaveProperty('textContent', '文件不存在');
+  await user.click(screen.getByRole('button', { name: '移除文件记录 gone.md' }));
+  await waitFor(() => expect(screen.queryByRole('button', { name: '打开文件 gone.md' })).toBeNull());
+  await user.click(screen.getByRole('button', { name: '打开目录 old' }));
+  await waitFor(() => expect(model.root?.path).toBe('/old'));
+  expect(screen.queryByRole('dialog', { name: '最近打开' })).toBeNull();
+  expect(screen.getByRole('button', { name: '关闭目录' })).toBeTruthy();
+});
+
+it('restores saved tabs in the existing compact layout and shows recoverable failure details', async () => {
+  const state = {version:1 as const,directory:null,tabs:[{path:'/a.md',mode:'document' as const,reading:false},{path:'/b.md',mode:'document' as const,reading:true}],activePath:'/b.md'};
+  const session: WorkspaceSessionGateway = {restore:vi.fn().mockResolvedValue({exists:true,session:state,root:null,tabs:state.tabs.map(tab=>({...tab,file:{path:tab.path,name:tab.path.slice(1),content:'# 恢复正文'}})),errors:['文件恢复失败：missing.md']}),write:vi.fn().mockResolvedValue(undefined)};
+  const {model,user}=fixture(undefined,session); mounted.push(model);
+  await act(async()=>{await model.restoreSession();});
+  expect(screen.getByRole('tab',{name:'b.md'}).getAttribute('aria-selected')).toBe('true');
+  expect(screen.queryByRole('tab',{name:'使用指南'})).toBeNull();
+  expect(screen.getByText(/有 1 项未能恢复/)).toBeTruthy();
+  expect(model.active?.reading).toBe(true); await user.click(screen.getByRole('button',{name:'关闭提示'}));
+  expect(screen.queryByText(/有 1 项未能恢复/)).toBeNull();
 });

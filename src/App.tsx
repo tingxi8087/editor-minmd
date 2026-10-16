@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { App as InkApp, Button, ConfigProvider, Modal } from "paper-ink";
-import { IconArrowBackUp, IconArrowForwardUp, IconArrowUpRight, IconBook2, IconChevronDown, IconCode, IconFolderOpen, IconLayoutSidebar, IconList, IconListCheck, IconListNumbers, IconMoon, IconPlus, IconQuote, IconFileText, IconSun, IconTable, IconTypography, IconBold, IconItalic, IconStrikethrough, IconRefresh, IconPhoto, IconX, IconSettings, IconSearch } from "paper-ink/icons";
+import { IconArrowBackUp, IconArrowForwardUp, IconArrowUpRight, IconBook2, IconChevronDown, IconCode, IconFolderOpen, IconLayoutSidebar, IconList, IconListCheck, IconListNumbers, IconMoon, IconPlus, IconQuote, IconFileText, IconSun, IconTable, IconTypography, IconBold, IconItalic, IconStrikethrough, IconRefresh, IconPhoto, IconX, IconSettings, IconSearch, IconHistory } from "paper-ink/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
+import RecentEntries from "@/components/RecentEntries";
+import { workspaceSession } from "@/lib/workspaceSession";
+import { RecentModel } from "@/lib/recents";
 import Settings from "@/components/Settings";
 import { connectExternalFiles } from "@/lib/externalFiles";
 import BackgroundSettings from "@/components/BackgroundSettings";
@@ -22,11 +25,17 @@ import { WorkspaceModel } from "@/workspace/model";
 import { useSettings } from "@/store/settings";
 
 const guide = `# 从一页空白开始。\n\n把想法写下来，让文字回到文字。\n\neditor-minmd 是一个本地 Markdown 编辑器。打开你的文档，直接编辑排版后的内容，再保存回原来的文件。\n\n## 像写文档一样，写 Markdown\n\n不必来回切换编辑与预览。标题、列表、引用和代码，都在纸面上自然呈现。\n\n- 用 **粗体** 标出重点，用 *斜体* 留一点语气。\n- 输入 \`#\` 再按空格，开始一个标题。\n- 输入 \`-\` 再按空格，整理一份清单。\n\n> 简单的工具，留出更多思考的空间。\n\n## 留在本地，随时继续\n\n你的文档仍是普通的 Markdown 文件。不需要账号，也不需要上传。\n\n| 操作 | 快捷键 |\n| --- | --- |\n| 打开 Markdown | ⌘ / Ctrl + O |\n| 保存文档 | ⌘ / Ctrl + S |\n| 新建 MD | ⌘ / Ctrl + N |\n\n---\n\n点击右上角的「打开文件」，或新建一页，开始写作。\n`;
+const noopSubscribe = () => () => {};
+const zeroSnapshot = () => 0;
 const iconProps = { size: 17, stroke: 1.65 };
 
 export function Workspace({ workspace, background: suppliedBackground }: { workspace: WorkspaceModel; background?: BackgroundModel }) {
   const [background] = useState(() => suppliedBackground ?? new BackgroundModel());
   useSyncExternalStore(background.subscribe, background.snapshot);
+  const recent = workspace.recents;
+  useSyncExternalStore(recent?.subscribe ?? noopSubscribe, recent?.snapshot ?? zeroSnapshot);
+  const [recentOpen, setRecentOpen] = useState(false);
+  useEffect(() => { void recent?.load(); }, [recent]);
   const [backgroundOpen, setBackgroundOpen] = useState(false);
   const [associationsOpen, setAssociationsOpen] = useState(false);
   const [associationBusy, setAssociationBusy] = useState(false);
@@ -158,6 +167,7 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
       <div className="top-actions">
         <Button size="small" onClick={() => { if (ensureDesktop()) void workspace.chooseFile(); }} disabled={busy}>打开文件</Button>
         <Button size="small" title="打开目录 · ⌘/Ctrl Shift O" icon={<IconFolderOpen {...iconProps} />} onClick={() => void chooseDirectory()} disabled={busy}>打开目录</Button>
+        {recent && <div className="recent-action"><Button size="small" aria-label="最近打开" aria-expanded={recentOpen} title={recent.error ? '最近打开 · 记录需要处理' : '最近文件和目录'} icon={<IconHistory size={16} />} onClick={() => { if (!recentOpen) void recent.load(); setRecentOpen(!recentOpen); }} />{recentOpen && <RecentEntries files={recent.files} directories={recent.directories} error={recent.error} busy={busy || recent.busy || !!workspace.closing} onClose={() => setRecentOpen(false)} onOpen={async (entry, directory) => { if (await workspace.openRecent(entry.path, directory)) { setRecentOpen(false); if (directory) { setPane('files'); if (!useSettings.getState().sidebar) useSettings.getState().toggleSidebar(); } } }} onRemove={(entry, directory) => void recent.remove(entry.path, directory)} onClear={() => void recent.clear()} />}</div>}
       </div>
     </header>
     <div className="workbench">
@@ -218,7 +228,7 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
 
 function WorkspaceRoot() {
   const [workspace, setWorkspace] = useState<WorkspaceModel | null>(null);
-  useEffect(() => { const model = new WorkspaceModel(); model.addGuide(guide); setWorkspace(model); if (desktopAvailable) void model.startReliability(); return () => model.dispose(); }, []);
+  useEffect(() => { const model = new WorkspaceModel(undefined, undefined, new RecentModel(), desktopAvailable ? workspaceSession : undefined); model.addGuide(guide); setWorkspace(model); if (desktopAvailable) void (async () => { await model.restoreSession(); await model.startReliability(); })(); return () => model.dispose(); }, []);
   useEffect(() => { if (workspace && desktopAvailable) return connectExternalFiles(workspace); }, [workspace]);
   return workspace ? <Workspace workspace={workspace} /> : null;
 }

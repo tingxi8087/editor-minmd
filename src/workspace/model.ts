@@ -1,3 +1,5 @@
+import type { SavedWorkspace, WorkspaceSessionGateway } from "@/lib/workspaceSession";
+import type { RecentModel } from "@/lib/recents";
 import { isLocalReference, mapReferences, rebaseReference, referenceMarkdown, validLink } from "@/lib/resources";
 import { SourceSession } from "@/components/SourceEditor/session";
 import { documentKind, type DocumentKind } from "@/lib/documentType";
@@ -54,15 +56,23 @@ export class WorkspaceModel {
   private persistLater = debounce(() => { void this.flushDrafts(); }, 650, { maxWait: 3000 });
   private checkLater = debounce(() => { void this.checkDisk(); }, 300, { maxWait: 1000 });
   private watchLater = debounce(() => { void this.syncWatches(); }, 100);
-  private focusCheck = () => { void this.flushDrafts(); void this.checkDisk(); };
+  private focusCheck = () => { if (this.sessionReady) void this.flushSession(); void this.flushDrafts(); void this.checkDisk(); };
   private revision = 0;
   private sequence = 0;
   private untitledSequence = { markdown: 0, text: 0 };
   private treeGeneration = 0;
   private disposed = false;
+  sessionReady = false;
+  sessionError = '';
+  sessionWarnings: string[] = [];
+  private sessionStarting = false;
+  private sessionWritten = '';
+  private sessionQueued = '';
+  private sessionChain: Promise<boolean> = Promise.resolve(true);
+  private sessionLater = debounce(() => { void this.flushSession(); }, 200, { maxWait: 1000 });
   private listeners = new Set<() => void>();
 
-  constructor(private gateway: FileGateway = files, private storage: ReliabilityGateway = reliability) {}
+  constructor(private gateway: FileGateway = files, private storage: ReliabilityGateway = reliability, readonly recents?: RecentModel, private sessionStorage?: WorkspaceSessionGateway) {}
   subscribe = (callback: () => void) => { this.listeners.add(callback); return () => { this.listeners.delete(callback); }; };
   snapshot = () => this.revision;
   get active() { return this.tabs.find((tab) => tab.id === this.activeId) ?? null; }
@@ -78,9 +88,65 @@ export class WorkspaceModel {
     if (this.reliabilityStarted && this.recoveryReady && !this.closing) this.persistLater();
     if (this.checkAgain && !this.busy && !this.closing) this.checkLater();
     if (this.reliabilityStarted) this.watchLater();
+    if (this.sessionStorage && this.sessionReady && !this.sessionStarting && !this.closing) {
+      const signature = JSON.stringify(this.sessionSnapshot());
+      if (signature !== this.sessionQueued) { this.sessionQueued = signature; this.sessionLater(); }
+    }
     this.revision++;
     this.listeners.forEach((callback) => callback());
   }
+  private sessionSnapshot(): SavedWorkspace {
+    const tabs = this.tabs.filter(tab => tab.path && !tab.guide).map(tab => ({ path: tab.path!, mode: tab.mode, reading: tab.reading }));
+    const active = this.tabs.find(tab => tab.id === (this.closing?.previousActiveId ?? this.activeId));
+    return { version: 1, directory: this.root?.path ?? null, tabs, activePath: active?.path && tabs.some(tab => tab.path === active.path) ? active.path : tabs[0]?.path ?? null };
+  }
+  async restoreSession() {
+    if (!this.sessionStorage || this.sessionStarting || this.busy || this.closing || this.disposed) return;
+    this.sessionStarting = true; this.busy = true; this.changed();
+    try {
+      // A retry must not race a pending activation/tab write or resurrect a just-closed tab.
+      if (this.sessionReady && !await this.flushSession()) return;
+      const restored = await this.sessionStorage.restore(this.root === null);
+      if (this.disposed) return;
+      if (restored.exists) {
+        const guides = this.tabs.filter(tab => tab.guide); guides.forEach(tab => tab.editor?.destroy());
+        this.tabs = this.tabs.filter(tab => !tab.guide);
+        if (restored.root && !this.root) {
+          this.treeGeneration++; this.root = restored.root;
+          this.children = new Map([[restored.root.path, restored.root.entries]]); this.expanded = new Set([restored.root.path]);
+        }
+        for (const saved of restored.tabs) {
+          if (this.tabs.some(tab => tab.path === saved.file.path)) continue;
+          const tab = this.add(saved.file.name, saved.file.content, saved.file.path, false);
+          if (saved.mode === 'source' && tab.mode !== 'source') { tab.mode = 'source'; this.attachSource(tab); }
+          tab.reading = tab.mode === 'document' && saved.reading;
+        }
+        this.activeId = this.tabs.find(tab => tab.path === restored.session.activePath)?.id ?? this.tabs[0]?.id ?? null;
+      }
+      this.sessionWarnings = restored.errors;
+      this.sessionReady = true; this.sessionError = '';
+      // Keep failed paths on disk until a deliberate workspace change, so a retry remains possible.
+      this.sessionWritten = this.sessionQueued = JSON.stringify(this.sessionSnapshot());
+    } catch (error) { this.sessionError = String(error); }
+    finally { this.sessionStarting = false; this.busy = false; this.changed(); }
+  }
+  async flushSession(snapshot = this.sessionSnapshot(), reset = false) {
+    this.sessionLater.cancel();
+    if (!this.sessionStorage) return true;
+    if (this.disposed || !this.sessionReady && !reset) return false;
+    const signature = JSON.stringify(snapshot);
+    this.sessionQueued = signature;
+    const write = this.sessionChain.then(async () => {
+      if (signature === this.sessionWritten && !reset) return true;
+      try {
+        await this.sessionStorage!.write(snapshot, reset);
+        this.sessionWritten = signature; this.sessionReady = true; this.sessionError = ''; return true;
+      } catch (error) { this.sessionError = String(error); return false; }
+      finally { if (!this.disposed) { this.revision++; this.listeners.forEach(callback => callback()); } }
+    });
+    this.sessionChain = write; return write;
+  }
+  dismissSessionWarnings() { this.sessionWarnings = []; this.changed(); }
   clearError() { this.error = ""; this.changed(); }
   reportError(error: unknown) { this.error = String(error); this.changed(); }
 
@@ -159,6 +225,7 @@ export class WorkspaceModel {
     return tab;
   }
   openFile(file: DocumentFile) {
+    void this.recents?.record(file.path, false);
     const existing = this.tabs.find((tab) => tab.path === file.path);
     if (existing) { this.activate(existing.id); return existing; }
     return this.add(file.name, file.content, file.path, false);
@@ -343,6 +410,7 @@ export class WorkspaceModel {
       }
       if (tab.source && !tab.languageOverride) tab.source.setFilename(kind === 'markdown' ? 'document.md' : saved.name);
       tab.dirty = false; tab.status = "已保存到本地";
+      void this.recents?.record(saved.path, false);
       if (oldPath && oldPath !== saved.path && oldPath !== tab.resourceBase && !this.tabs.some(item => item.id !== id && (item.path === oldPath || item.resourceBase === oldPath))) await this.gateway.releaseDocument(oldPath);
       const separator = Math.max(saved.path.lastIndexOf("/"), saved.path.lastIndexOf("\\"));
       const parent = saved.path.slice(0, separator);
@@ -378,6 +446,12 @@ export class WorkspaceModel {
     const removed = this.tabs.filter((tab) => plan.ids.includes(tab.id));
     const oldIndex = this.tabs.findIndex((tab) => tab.id === this.activeId);
     try {
+      const session = this.sessionSnapshot();
+      if (!plan.window) {
+        session.tabs = session.tabs.filter(item => !removed.some(tab => tab.path === item.path));
+        if (!session.tabs.some(tab => tab.path === session.activePath)) session.activePath = session.tabs[0]?.path ?? null;
+      }
+      if (!await this.flushSession(session)) { this.error = '工作区记录保存失败，请重试后关闭'; this.closing = null; return false; }
       // Complete native cleanup before allowing a path to be reopened.
       if (!await this.flushDrafts(plan.ids)) { this.closing = null; return false; }
       this.diskGeneration++;
@@ -388,6 +462,7 @@ export class WorkspaceModel {
       this.tabs = this.tabs.filter((tab) => !plan.ids.includes(tab.id));
       if (this.tabs.some((tab) => tab.id === plan.previousActiveId)) this.activeId = plan.previousActiveId;
       else if (!this.tabs.some((tab) => tab.id === this.activeId)) this.activeId = this.tabs[Math.min(Math.max(oldIndex, 0), this.tabs.length - 1)]?.id ?? null;
+      if (plan.window) this.sessionReady = false;
       this.closing = null;
       return plan.window;
     } catch (error) { this.error = String(error); this.closing = null; return false; }
@@ -613,6 +688,7 @@ export class WorkspaceModel {
       this.children = new Map([...this.children].map(([key, entries]) => [mapped(key), entries.map(entry => ({ ...entry, path: mapped(entry.path), name: entry.path === path ? name : entry.name }))]));
       this.expanded = new Set([...this.expanded].map(mapped));
       this.diskGeneration++; await this.loadDirectory(this.parentPath(target)); await this.flushDrafts();
+      void this.recents?.load();
       return true;
     } catch (error) { this.error = String(error); return false; }
     finally { this.busy = false; this.changed(); }
@@ -636,8 +712,34 @@ export class WorkspaceModel {
       this.children = new Map([...this.children].filter(([key]) => !this.pathWithin(key, path)).map(([key, entries]) => [key, entries.filter(entry => !this.pathWithin(entry.path, path))]));
       this.expanded = new Set([...this.expanded].filter(key => !this.pathWithin(key, path)));
       this.diskGeneration++; await this.loadDirectory(this.parentPath(path)); await this.flushDrafts();
+      void this.recents?.load();
       return true;
     } catch (error) { this.error = String(error); return false; }
+    finally { this.busy = false; this.changed(); }
+  }
+  private acceptRoot(root: DirectoryRoot) {
+    this.treeGeneration++; this.root = root;
+    this.children = new Map([[root.path, root.entries]]); this.expanded = new Set([root.path]);
+    this.loading.clear(); this.treeErrors.clear();
+    void this.recents?.record(root.path, true);
+  }
+  async openRecent(path: string, directory: boolean) {
+    if (!this.recents || this.busy || this.closing || this.disposed) return false;
+    const existing = !directory && this.tabs.find(tab => tab.path === path);
+    if (existing) { this.activate(existing.id); void this.recents.record(path, false); return true; }
+    this.busy = true; this.changed();
+    try {
+      if (directory) {
+        const root = await this.recents.gateway.openDirectory(path);
+        if (this.disposed) return false;
+        this.acceptRoot(root);
+      } else {
+        const file = await this.recents.gateway.openFile(path);
+        if (this.disposed) return false;
+        this.busy = false; this.openFile(file);
+      }
+      return true;
+    } catch (error) { this.recents.reportError(error); return false; }
     finally { this.busy = false; this.changed(); }
   }
   async chooseDirectory() {
@@ -646,9 +748,7 @@ export class WorkspaceModel {
     try {
       const root = await this.gateway.openDirectory();
       if (root && !this.disposed) {
-        this.treeGeneration++; this.root = root;
-        this.children = new Map([[root.path, root.entries]]); this.expanded = new Set([root.path]);
-        this.loading.clear(); this.treeErrors.clear();
+        this.acceptRoot(root);
       }
     } catch (error) { this.error = String(error); }
     finally { this.busy = false; this.changed(); }
@@ -685,7 +785,7 @@ export class WorkspaceModel {
     finally { this.busy = false; this.changed(); }
   }
   dispose() {
-    this.persistLater.cancel(); this.checkLater.cancel(); this.watchLater.cancel();
+    this.persistLater.cancel(); this.checkLater.cancel(); this.watchLater.cancel(); this.sessionLater.cancel();
     if (this.pollTimer) clearInterval(this.pollTimer);
     this.offDisk?.(); window.removeEventListener("focus", this.focusCheck); window.removeEventListener("blur", this.focusCheck);
     this.disposed = true; this.treeGeneration++; this.listeners.clear();

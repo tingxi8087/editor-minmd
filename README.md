@@ -9,6 +9,8 @@ MIT 开源的本地 Markdown 桌面编辑器。使用 Tauri 2、React、Tiptap�
 设计方案、已实现能力、当前限制和待实现清单集中在 [doc/](doc/README.md)：
 
 - [设计方案与方案演变](doc/design.md)
+- [重启工作区恢复](doc/workspace-session.md)
+- [最近文件与目录](doc/recent-items.md)
 - [实现现状与验证范围](doc/status.md)
 - [源码、文本与代码编辑](doc/source-editing.md)
 - [目录文件管理与界面中文化](doc/file-management.md)

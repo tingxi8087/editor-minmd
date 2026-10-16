@@ -85,6 +85,26 @@ fn current_root(root: &WorkspaceRoot, expected: &str) -> Result<PathBuf, String>
     }
 }
 
+// Only callers that have validated an explicit user choice or a recorded recent root use this.
+pub(crate) fn open_recorded_directory(
+    app: &tauri::AppHandle,
+    path: PathBuf,
+) -> Result<DirectoryRoot, String> {
+    let entries = list(&path, &path)?;
+    *app.state::<WorkspaceRoot>()
+        .0
+        .lock()
+        .map_err(|e| e.to_string())? = Some(path.clone());
+    Ok(DirectoryRoot {
+        name: path
+            .file_name()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.display().to_string()),
+        path: path.to_string_lossy().into_owned(),
+        entries,
+    })
+}
+
 #[tauri::command]
 pub async fn open_directory(app: tauri::AppHandle) -> Result<Option<DirectoryRoot>, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -361,6 +381,9 @@ pub async fn rename_workspace_entry(
                     .unwrap_or_else(|_| item.clone())
             })
             .collect();
+        drop(opened);
+        drop(selected);
+        crate::recents::update_after_mutation(&app, &source, Some(&target));
         Ok(target.to_string_lossy().into_owned())
     })
     .await
@@ -387,6 +410,9 @@ pub async fn trash_workspace_entry(
             trash::delete(p).map_err(|e| format!("移到系统回收站失败，未改为永久删除：{e}"))
         })?;
         opened.retain(|item| !item.starts_with(&source));
+        drop(opened);
+        drop(selected);
+        crate::recents::update_after_mutation(&app, &source, None);
         Ok(())
     })
     .await

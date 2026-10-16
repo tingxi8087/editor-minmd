@@ -1,8 +1,10 @@
 mod associations;
 mod background;
 mod menu;
+mod recents;
 mod reliability;
 mod resources;
+mod session;
 mod workspace;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -234,11 +236,21 @@ pub fn run() {
         .manage(reliability::RecoveryLock::default())
         .manage(reliability::DocumentWatcher::default())
         .manage(workspace::WorkspaceRoot::default())
+        .manage(recents::RecentIo::default())
+        .manage(session::SessionIo::default())
         .plugin(tauri_plugin_dialog::init())
         .menu(menu::build)
         .on_menu_event(menu::dispatch)
         .manage(background::BackgroundIo::default())
         .invoke_handler(tauri::generate_handler![
+            session::restore_workspace_session,
+            session::write_workspace_session,
+            recents::load_recent_entries,
+            recents::record_recent_entry,
+            recents::remove_recent_entry,
+            recents::clear_recent_entries,
+            recents::open_recent_document,
+            recents::open_recent_directory,
             associations::association_platform,
             associations::set_default_associations,
             associations::take_external_files,
