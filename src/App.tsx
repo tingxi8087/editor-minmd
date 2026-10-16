@@ -3,7 +3,7 @@ import { App as InkApp, Button, ConfigProvider, Modal } from "paper-ink";
 import { IconArrowBackUp, IconArrowForwardUp, IconArrowUpRight, IconBook2, IconChevronDown, IconCode, IconFolderOpen, IconLayoutSidebar, IconList, IconListCheck, IconListNumbers, IconMoon, IconPlus, IconQuote, IconFileText, IconSun, IconTable, IconTypography, IconBold, IconItalic, IconStrikethrough, IconRefresh, IconPhoto, IconX, IconSettings } from "paper-ink/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
-import AssociationSettings from "@/components/AssociationSettings";
+import Settings from "@/components/Settings";
 import { connectExternalFiles } from "@/lib/externalFiles";
 import BackgroundSettings from "@/components/BackgroundSettings";
 import { BackgroundModel } from "@/lib/background";
@@ -142,7 +142,7 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
         <button className="rail-button" aria-label="新建 Markdown" title="新建 Markdown" disabled={busy} onClick={() => workspace.create()}><IconPlus size={21} stroke={1.5} /></button>
         <button className="rail-button" aria-label="新建文本" title="新建无后缀文本 · ⌘/Ctrl Shift N" disabled={busy} onClick={() => workspace.create("text")}><IconFileText size={21} stroke={1.5} /></button>
         <span className="rail-spacer" />
-        <button className="rail-button" aria-label="默认打开方式" title="默认打开方式" onClick={() => setAssociationsOpen(true)}><IconSettings size={20} stroke={1.5} /></button>
+        <button className="rail-button" aria-label="设置" title="设置" onClick={() => setAssociationsOpen(true)}><IconSettings size={20} stroke={1.5} /></button>
         <button className={`rail-button ${backgroundOpen ? 'selected' : ''}`} aria-label="背景设置" aria-expanded={backgroundOpen} title={background.error ? '背景设置 · 需要处理' : '背景设置'} onClick={() => { if (backgroundOpen) void background.flush(); setBackgroundOpen(!backgroundOpen); }}><IconPhoto size={20} stroke={1.5} />{background.error && <i className="appearance-warning" />}</button>
         <button className="rail-button" aria-label={dark ? "切换浅色" : "切换深色"} title={dark ? "浅色纸面" : "深色墨纸"} onClick={toggleDark}>{dark ? <IconSun size={20} stroke={1.5} /> : <IconMoon size={20} stroke={1.5} />}</button>
       </nav>
@@ -186,7 +186,7 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
       else setSlashInsert({ id: session.id, kind, ...range });
     }} />}
     <SlashInsert workspace={workspace} request={slashInsert} onClose={() => setSlashInsert(null)} />
-    {associationsOpen && <AssociationSettings onBusyChange={setAssociationBusy} onClose={() => setAssociationsOpen(false)} />}
+    {associationsOpen && <Settings onBusyChange={setAssociationBusy} onClose={() => setAssociationsOpen(false)} />}
     <Modal open={!!target} title="保存这页的修改？" onCancel={() => workspace.cancelClose()} footer={<div className="leave-actions"><Button disabled={busy} onClick={() => workspace.cancelClose()}>继续编辑</Button><Button disabled={busy} danger onClick={async () => { workspace.approveClose(); if (!workspace.closeTarget) await completeClose(); }}>不保存</Button><Button type="primary" disabled={busy} onClick={async () => { if (target && await save(target.id)) { workspace.approveClose(); if (!workspace.closeTarget) await completeClose(); } }}>保存并继续</Button></div>}><p>「{target?.name}」有未保存的修改。保存后再关闭，或放弃本次修改。</p>{(workspace.closing?.remaining.length ?? 0) > 1 && <p>还有 {workspace.closing!.remaining.length} 份文档需要确认。</p>}{workspace.error && <p role="alert" className="dialog-error">{workspace.error}</p>}</Modal>
   </div>;
 }

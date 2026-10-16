@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Modal } from 'paper-ink';
+import { Button, Modal, Tabs } from 'paper-ink';
 import { associationExtensions, associationGroups, associations, type AssociationGateway, type AssociationResult } from '@/lib/associations';
 import styles from './index.module.less';
+import { version, license } from '../../../package.json';
 const storageKey = 'minmd-file-associations-v1';
 function loadSelection() {
   try {
@@ -15,7 +16,8 @@ function GroupCheckbox({ name, count, total, disabled, onChange }: { name: strin
   useEffect(() => { if (ref.current) ref.current.indeterminate = count > 0 && count < total; }, [count, total]);
   return <label><input ref={ref} type="checkbox" checked={count === total} aria-checked={count > 0 && count < total ? 'mixed' : count === total} disabled={disabled} onChange={onChange} />{name}<small>{count}/{total}</small></label>;
 }
-export default function AssociationSettings({ onClose, onBusyChange, gateway = associations }: { onClose: () => void; onBusyChange?: (busy: boolean) => void; gateway?: AssociationGateway }) {
+export default function Settings({ onClose, onBusyChange, gateway = associations }: { onClose: () => void; onBusyChange?: (busy: boolean) => void; gateway?: AssociationGateway }) {
+  const [tab, setTab] = useState('associations');
   const [selected, setSelected] = useState(loadSelection);
   const [supported, setSupported] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
@@ -31,8 +33,9 @@ export default function AssociationSettings({ onClose, onBusyChange, gateway = a
     try { setResults(await gateway.apply(selected)); } catch (e) { setError(String(e)); } finally { setBusy(false); onBusyChange?.(false); }
   };
   const disabled = busy || supported !== true;
-  return <Modal open getContainer={false} title="默认打开方式" width={480} maskClosable={false} keyboard={!busy} closable={!busy} onCancel={() => { if (!busy) onClose(); }} footer={<div className={styles.footer}><span>已选择 {selected.length} 种扩展名</span><Button size="small" disabled={busy} onClick={onClose}>关闭</Button><Button size="small" type="primary" disabled={disabled || !selected.length} onClick={() => void apply()}>{busy ? '正在设置…' : '设为默认打开应用'}</Button></div>}>
-    <div className={styles.content}>
+  return <Modal open getContainer={false} title="设置" width={480} maskClosable={false} keyboard={!busy} closable={!busy} onCancel={() => { if (!busy) onClose(); }} footer={<div className={styles.footer}>{tab === 'associations' && <span>已选择 {selected.length} 种扩展名</span>}<Button size="small" disabled={busy} onClick={onClose}>关闭</Button>{tab === 'associations' && <Button size="small" type="primary" disabled={disabled || !selected.length} onClick={() => void apply()}>{busy ? '正在设置…' : '设为默认打开应用'}</Button>}</div>}>
+    <Tabs size="small" activeKey={tab} onChange={setTab} items={[
+      { key: 'associations', label: '默认打开方式', disabled: busy, children: <div className={styles.content}>
       <p>在访达中双击所选类型的文件，使用 MinMD 打开。</p>
       <div className={styles.actions}><Button size="small" type="text" disabled={disabled} onClick={() => change([...associationExtensions])}>全选</Button><Button size="small" type="text" disabled={disabled} onClick={() => change([])}>取消全选</Button></div>
       {associationGroups.map(group => {
@@ -46,6 +49,14 @@ export default function AssociationSettings({ onClose, onBusyChange, gateway = a
       {supported === false && <p role="status">目前仅支持 macOS 桌面应用。</p>}
       {error && <p role="alert" className={styles.error}>{error}</p>}
       {!!results.length && <div className={styles.results} role="status"><strong>{results.filter(row => row.success).length}/{results.length} 项已设为默认</strong>{results.map(row => <p key={row.extension} className={row.success ? undefined : styles.error}><code>.{row.extension}</code><span>{row.message}</span></p>)}</div>}
-    </div>
+    </div> },
+      { key: 'about', label: '关于', disabled: busy, children: <div className={styles.about}>
+        <h3>MinMD · 纸墨</h3>
+        <p>专注 Markdown 的本地文本编辑器。</p>
+        <dl><div><dt>版本</dt><dd>{version}</dd></div><div><dt>开源许可</dt><dd>{license}</dd></div></dl>
+        <p>支持所见即所得编辑、阅读、源码编辑，以及普通文本与代码查看。文档保存在本地。</p>
+        <small>© 2026 tingxi8087</small>
+      </div> },
+    ]} />
   </Modal>;
 }

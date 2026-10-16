@@ -37,4 +37,6 @@ macOS 的 `RunEvent::Opened` 接收 file URL 并在 Rust 端排队。前端先�
 - 浅色/深色紧凑弹窗均已检查，结束后恢复浅色；`.app` 构建与 Info.plist 核对：31 类文档能力、11 类自有文本 UTI、2 类导入类型。Vite 仍有既有主包体积警告。
 - 未完整验收不同 macOS 版本、系统确认提示/拒绝、多个同标识 `.app` 并存以及所有扩展名的双击行为；逐项系统失败不能视为整体成功。
 
-源码：[原生关联与队列](../src-tauri/src/associations.rs)、[设置界面](../src/components/AssociationSettings/index.tsx)、[前端外部文件接收](../src/lib/externalFiles.ts)、[界面测试](../tests/associations.test.tsx)、[接收测试](../tests/external-files.test.ts)。
+源码：[原生关联与队列](../src-tauri/src/associations.rs)、[设置界面](../src/components/Settings/index.tsx)、[前端外部文件接收](../src/lib/externalFiles.ts)、[界面测试](../tests/associations.test.tsx)、[接收测试](../tests/external-files.test.ts)。
+
+设置入口现为左侧齿轮「设置」，默认进入「默认打开方式」页签；另有「关于」展示应用版本、项目简介与 MIT 许可。切换页签不会更改系统关联，也不会丢失已勾选项。

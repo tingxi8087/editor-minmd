@@ -2,13 +2,13 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import AssociationSettings from '../src/components/AssociationSettings';
+import Settings from '../src/components/Settings';
 import { associationExtensions, type AssociationGateway } from '../src/lib/associations';
 import { App, ConfigProvider } from 'paper-ink';
 const setup = (supported = true) => {
   const gateway: AssociationGateway = { supported: vi.fn().mockResolvedValue(supported), apply: vi.fn().mockResolvedValue([{ extension: 'md', contentType: 'net.daringfireball.markdown', success: true, message: '已设为默认' }]) };
   const close = vi.fn();
-  render(<ConfigProvider><App><AssociationSettings gateway={gateway} onClose={close} /></App></ConfigProvider>);
+  render(<ConfigProvider><App><Settings gateway={gateway} onClose={close} /></App></ConfigProvider>);
   return { gateway, close, user: userEvent.setup() };
 };
 beforeEach(() => localStorage.clear()); afterEach(cleanup);
@@ -73,4 +73,24 @@ it('keeps the UI, native whitelist and bundle declarations aligned without claim
   const claims = config.bundle.fileAssociations;
   expect(claims.flatMap((row: { ext: string[] }) => row.ext).sort()).toEqual(associationExtensions.filter(ext => ext !== 'ts').sort());
   expect(claims.every((row: { contentTypes?: string[]; exportedType?: unknown }) => row.contentTypes?.length || row.exportedType)).toBe(true);
+});
+
+it('shows About without association actions and keeps selections when switching tabs', async () => {
+  const { user, gateway } = setup();
+  await user.click(screen.getByRole('tab', { name: '关于' }));
+  const manifest = await import('../package.json');
+  expect(screen.getByText(manifest.version)).toBeTruthy();
+  expect(screen.getByText('MIT')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '设为默认打开应用' })).toBeNull();
+  expect(gateway.apply).not.toHaveBeenCalled();
+  await user.click(screen.getByRole('tab', { name: '默认打开方式' }));
+  await user.click(screen.getByRole('button', { name: '取消全选' }));
+  await user.click(screen.getByRole('tab', { name: '关于' }));
+  await user.click(screen.getByRole('tab', { name: '默认打开方式' }));
+  expect(screen.getByText('已选择 0 种扩展名')).toBeTruthy();
+});
+
+it('treats the browser preview as unsupported without invoking a native bridge', async () => {
+  const { associations } = await import('../src/lib/associations');
+  await expect(associations.supported()).resolves.toBe(false);
 });

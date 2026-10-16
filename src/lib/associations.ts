@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 export const associationGroups = [
   { name: 'Markdown', extensions: ['md', 'markdown'] },
   { name: '普通文本', extensions: ['txt', 'text', 'log'] },
@@ -8,7 +8,7 @@ export const associationGroups = [
 export const associationExtensions = associationGroups.flatMap(group => group.extensions);
 export interface AssociationResult { extension: string; contentType: string | null; success: boolean; message: string }
 export const associations = {
-  supported: () => invoke<boolean>('association_platform'),
+  supported: () => isTauri() ? invoke<boolean>('association_platform') : Promise.resolve(false),
   apply: (extensions: string[]) => invoke<AssociationResult[]>('set_default_associations', { extensions }),
 };
 export type AssociationGateway = typeof associations;
