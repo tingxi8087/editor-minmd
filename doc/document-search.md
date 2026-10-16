@@ -44,3 +44,5 @@ HTML 已从可勾选扩展名、原生默认关联白名单及 macOS 安装包�
 - 正式桌面构建通过 `npm run build` 导出到版本目录；查找不包含浏览器原生页面搜索。
 
 源码：[查找插件](../src/components/DocumentSearch/extension.ts)、[查找栏](../src/components/DocumentSearch/index.tsx)、[快捷键与工作台](../src/App.tsx)、[设置](../src/components/Settings/index.tsx)。
+
+2026-10-17：阅读改为独立原文渲染，查找使用 DOM Range/CSS Highlights，只查找不替换；文档模式继续使用原有 Tiptap 查找替换。特殊语法也可阅读查找，见[扩展阅读](reading-mode.md)。

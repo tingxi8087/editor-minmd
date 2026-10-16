@@ -124,6 +124,26 @@ pub async fn load_document_image(
     .await
     .map_err(|e| e.to_string())?
 }
+// Reading an embed must not open a tab, launch a URL, or register another file.
+fn read_embed(base: &Path, reference: &str) -> Result<DocumentFile, String> {
+    let url = resolve(base, reference)?;
+    if url.scheme() != "file" { return Err("仅支持嵌入本地 Markdown".into()); }
+    let path = url.to_file_path().map_err(|_| "无效的嵌入路径")?;
+    if !matches!(path.extension().and_then(|s| s.to_str()).unwrap_or("").to_ascii_lowercase().as_str(), "md" | "markdown" | "mdown") {
+        return Err("仅支持嵌入 Markdown 文档".into());
+    }
+    if fs::symlink_metadata(&path).map_err(|e| format!("嵌入文件无法读取：{e}"))?.file_type().is_symlink() {
+        return Err("不支持嵌入符号链接".into());
+    }
+    let path = path.canonicalize().map_err(|e| e.to_string())?;
+    if fs::metadata(&path).map_err(|e| e.to_string())?.len() > 1024 * 1024 { return Err("嵌入文档不能超过 1 MiB，请单独打开".into()); }
+    read_document(&path)
+}
+#[tauri::command]
+pub async fn read_embedded_document(document: String, reference: String, files: State<'_, OpenedFiles>) -> Result<DocumentFile, String> {
+    let base = authorized(&files, &document)?;
+    tauri::async_runtime::spawn_blocking(move || read_embed(&base, &reference)).await.map_err(|e| e.to_string())?
+}
 #[derive(Serialize)]
 pub struct ImportedImage {
     reference: String,
@@ -294,6 +314,35 @@ pub async fn open_document_link(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn embedded_markdown_is_read_only_local_bounded_and_validated() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().join("main.md");
+        let child = dir.path().join("child.md");
+        fs::write(&base, "# main").unwrap();
+        fs::write(&child, "# 子文档\r\n").unwrap();
+        let result = read_embed(&base, "child.md#标题").unwrap();
+        assert_eq!(result.content, "# 子文档\r\n");
+        assert_eq!(fs::read_to_string(&child).unwrap(), result.content);
+        assert!(read_embed(&base, "https://example.com/a.md").is_err());
+        assert!(read_embed(&base, "missing.md").is_err());
+        fs::write(dir.path().join("a.txt"), "text").unwrap();
+        assert!(read_embed(&base, "a.txt").is_err());
+        fs::write(&child, [0_u8, 1, 2]).unwrap();
+        assert!(read_embed(&base, "child.md").is_err());
+        fs::write(&child, vec![b'x'; 1024 * 1024 + 1]).unwrap();
+        assert!(read_embed(&base, "child.md").is_err());
+    }
+    #[cfg(unix)]
+    #[test]
+    fn embedded_markdown_rejects_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().join("main.md");
+        let child = dir.path().join("child.md");
+        fs::write(&child, "# child").unwrap();
+        std::os::unix::fs::symlink(&child, dir.path().join("link.md")).unwrap();
+        assert!(read_embed(&base, "link.md").is_err());
+    }
     #[test]
     fn markdown_reference_uses_portable_encoded_paths_and_validates_content() {
         let dir = tempfile::tempdir().unwrap();

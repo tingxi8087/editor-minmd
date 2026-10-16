@@ -1,0 +1,23 @@
+.reader-scroll { overscroll-behavior: none; }
+.markdown-reading {
+  .reader-code { margin: 12px 0; position: relative; padding-top: 24px; border: 1px solid var(--line); background: var(--wash); border-radius: 4px;
+    > button { position: absolute; right: 8px; top: 3px; padding: 0 5px; font-size: 11px; color: var(--secondary); border: 0; background: transparent; cursor: pointer; }
+    > pre { margin: 0; border: 0; border-top: 1px solid var(--line); }
+  }
+  .reader-label { display: block; color: var(--ink); font-size: 12px; font-weight: 600; margin-bottom: 5px; }
+  .reader-alert, .reader-container { margin: 12px 0; padding: 8px 14px; border: 1px solid var(--line); border-left: 3px solid var(--muted); background: var(--wash); border-radius: 3px; }
+  .reader-embed { display: block; margin: 10px 0; padding: 8px 12px; border: 1px solid var(--line); border-radius: 4px; font-size: 13px; }
+  .reader-embed-body { margin-top: 8px; font-size: 14px; }
+  .reader-resource-error { display: block; color: var(--secondary); font-size: 12px; white-space: pre-wrap; }
+  .reader-math { overflow-x: auto; padding: 4px; }
+  .reader-formula-error { white-space: pre-wrap; }
+  .reader-mermaid { margin: 12px 0; img { display: block; max-width: 100%; height: auto; margin: auto; } }
+  .footnotes { font-size: 13px; color: var(--secondary); border-top: 1px solid var(--line); }
+  li.reader-task { list-style: none; }
+  input[type=checkbox] { pointer-events: none; accent-color: var(--ink); }
+  .katex { font-size: 1.08em; }
+  .katex-html { white-space: nowrap; }
+}
+::highlight(reader-search) { background: #e5cf89; color: #25251f; }
+::highlight(reader-current) { background: #b7954b; color: #fff; }
+.reader-surface { flex-direction: column; }

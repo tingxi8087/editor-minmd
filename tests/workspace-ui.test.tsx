@@ -151,7 +151,7 @@ describe('workspace UI integration', () => {
     expect(a.editor!.view.dom.querySelector('.document-search-match')).toBeNull(); expect(a.dirty).toBe(false);
     act(() => { model.openFile({ path: '/notes/raw.md', name: 'raw.md', content: '<!-- 原样保留 -->\n' }); });
     fireEvent.keyDown(window, { key: '1', metaKey: true }); expect(model.active!.mode).toBe('source');
-    fireEvent.keyDown(window, { key: '2', metaKey: true }); expect(model.active!.mode).toBe('source');
+    fireEvent.keyDown(window, { key: '2', metaKey: true }); expect(model.active!.mode).toBe('document'); expect(model.active!.reading).toBe(true);
     expect(model.markdown(model.active!)).toBe('<!-- 原样保留 -->\n'); expect(model.active!.dirty).toBe(false);
   });
   it('captures Command/Ctrl B for the sidebar without changing bold or document content', async () => {
@@ -544,4 +544,29 @@ it('restores saved tabs in the existing compact layout and shows recoverable fai
   expect(screen.getByText(/有 1 项未能恢复/)).toBeTruthy();
   expect(model.active?.reading).toBe(true); await user.click(screen.getByRole('button',{name:'关闭提示'}));
   expect(screen.queryByText(/有 1 项未能恢复/)).toBeNull();
+});
+
+it('reads protected raw Markdown with headings and search, keeps source authoritative and shows one conversion warning', async () => {
+  const {model,user,gateway,background} = setup();
+  await waitFor(() => expect(background.busy).toBe(false));
+  const raw = '\uFEFF# 扩展阅读\r\n\r\n正文[^1]\r\n\r\n[^1]: 脚注备注\r\n\r\n$E=mc^2$\r\n\r\n<!-- 原文注释 -->\r\n';
+  act(() => model.openFile({path:'/notes/extended.md',name:'extended.md',content:raw}));
+  fireEvent.keyDown(window,{key:'1',metaKey:true});
+  expect(screen.getAllByRole('alert')).toHaveLength(1); expect(document.querySelector('.notice-banner')).toBeNull();
+  fireEvent.keyDown(window,{key:'2',metaKey:true});
+  await waitFor(() => expect(screen.getByRole('article').textContent).toContain('脚注备注'));
+  expect(screen.queryByRole('alert')).toBeNull(); expect(screen.getByRole('button',{name:'# 扩展阅读'})).toBeTruthy();
+  fireEvent.keyDown(window,{key:'f',metaKey:true});
+  await user.type(screen.getByRole('textbox',{name:'查找内容'}),'脚注备注');
+  expect(screen.getByRole('region',{name:'文档查找'}).textContent).toContain('1 / 1');
+  expect(screen.queryByRole('button',{name:'展开替换'})).toBeNull();
+  expect(model.markdown(model.active!)).toBe(raw); expect(model.active!.dirty).toBe(false);
+  fireEvent.keyDown(window,{key:'3',metaKey:true});
+  act(() => model.active!.source!.dispatch({changes:{from:model.active!.source!.state.doc.length,insert:'\r\n源码新增'}}));
+  const changed = model.markdown(model.active!);
+  fireEvent.keyDown(window,{key:'2',metaKey:true});
+  await waitFor(() => expect(screen.getByRole('article').textContent).toContain('源码新增'));
+  await act(async () => { await model.save(model.activeId!); });
+  expect(gateway.saveDocument.mock.calls[0][1]).toBe(changed);
+  expect(model.active!.dirty).toBe(false);
 });

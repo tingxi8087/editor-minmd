@@ -99,7 +99,7 @@ it('keeps unsupported Markdown in source and rejects unsafe mode selection witho
     const unsupported = model.openFile({ path: '/footnote.md', name: 'footnote.md', content: '文字[^1]\n\n[^1]: 注释\n' });
     expect(model.selectMode('document')).toBe(false); expect(useSettings.getState().markdownMode).toBe('source');
     model.activate(tabs[0].id); model.selectMode('reading');
-    expect(unsupported.mode).toBe('source'); expect(tabs.every(tab => tab.reading)).toBe(true);
+    expect(unsupported.mode).toBe('document'); expect(unsupported.reading).toBe(true); expect(tabs.every(tab => tab.reading)).toBe(true);
     expect(model.markdown(unsupported)).toBe(unsupported.raw);
   });
 });

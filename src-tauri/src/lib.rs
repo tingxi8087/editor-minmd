@@ -260,6 +260,7 @@ pub fn run() {
             background::reset_background,
             resources::choose_markdown_reference,
             resources::load_document_image,
+            resources::read_embedded_document,
             resources::import_document_image,
             resources::open_document_link,
             reliability::load_drafts,

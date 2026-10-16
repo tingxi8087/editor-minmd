@@ -5,6 +5,7 @@ import { EditorState } from '@codemirror/state';
 import { SourceSession } from '../src/components/SourceEditor/session';
 import { WorkspaceModel } from '../src/workspace/model';
 import { rebaseReference } from '../src/lib/resources';
+import { useSettings } from '../src/store/settings';
 import { files } from '../src/lib/files';
 import type { Draft, ReliabilityGateway } from '../src/lib/reliability';
 import { sourceReferenceTokens, rebaseSourceContent } from '../src/lib/sourceResources';
@@ -176,4 +177,80 @@ describe('source-mode Save As resource rewriting', () => {
     await model.save(tab.id, true); expect(gateway.saveDocument.mock.calls[0][5]?.references[0].value).toBe('assets/a.png');
     expect(tab.sourceText).toBe('#   A\n\n![图](../notes/assets/a.png)\n\n\n'); expect(tab.source!.text()).toBe(tab.raw); expect(tab.dirty).toBe(false);
   });
+});
+
+
+describe('raw reading fidelity and source ownership', () => {
+  it('allows every protected extension in reading, refuses rich editing and keeps bytes across clean save/close', async () => {
+    const { model, gateway } = setup();
+    const raw = '\uFEFF---\r\ntitle: 原文\r\n---\r\n# 标题\r\n\r\n脚注[^1]\r\n\r\n[^1]: 内容\r\n\r\n$$x^2$$\r\n\r\n> [!NOTE]\r\n> 提示\r\n\r\n[[其他]]\r\n\r\n::: custom\r\n内容\r\n:::\r\n\r\n<!-- 保留 -->\r\n\r\n';
+    const tab = model.openFile(file('mixed.md', raw));
+    expect(tab.mode).toBe('source'); expect(model.selectMode('reading')).toBe(true);
+    expect(tab.mode).toBe('document'); expect(tab.reading).toBe(true); expect(tab.editor).toBeNull();
+    expect(model.markdown(tab)).toBe(raw); expect(tab.dirty).toBe(false);
+    expect(model.selectMode('document')).toBe(false); expect(tab.reading).toBe(true);
+    model.selectMode('source'); model.selectMode('reading');
+    await model.save(tab.id); expect(gateway.saveDocument).not.toHaveBeenCalled(); expect(model.markdown(tab)).toBe(raw);
+    model.requestClose([tab.id]); expect(model.closeTarget).toBeNull();
+    useSettings.setState({markdownMode:'document'});
+  });
+  it('synchronizes source changes after repeated reading transitions without reviving a stale rich editor', async () => {
+    const {model, gateway} = setup(); const tab = model.openFile(file('a.md','# 原标题\n\n正文\n'));
+    model.selectMode('source'); insert(model, '\n新增内容');
+    const edited = model.markdown(tab);
+    model.selectMode('reading'); expect(model.markdown(tab)).toBe(edited);
+    model.selectMode('source'); model.selectMode('reading'); model.selectMode('document');
+    expect(tab.editor!.getText()).toContain('新增内容'); expect(model.markdown(tab)).toBe(edited);
+    await model.save(tab.id); expect(gateway.saveDocument.mock.calls[0][1]).toBe(edited);
+    useSettings.setState({markdownMode:'document'});
+  });
+  it('opens new protected files directly in the persisted reading preference and retains dirty source edits', async () => {
+    const {model, make, gateway} = setup(); useSettings.setState({markdownMode:'reading'});
+    const tab = model.openFile(file('notes.md','文字[^1]\n\n[^1]: 注释\n'));
+    expect(tab.reading).toBe(true); expect(tab.mode).toBe('document'); expect(tab.source).toBeTruthy();
+    model.selectMode('source'); insert(model,'\n源码补充\n'); const text = model.markdown(tab);
+    model.selectMode('reading'); expect(tab.dirty).toBe(true);
+    await model.save(tab.id); expect(gateway.saveDocument.mock.calls[0][1]).toBe(text);
+    const reopened = make().openFile(file('notes.md', text)); expect(reopened.reading).toBe(true); expect(reopened.raw).toBe(text);
+    useSettings.setState({markdownMode:'document'});
+  });
+  it('does not misclassify inline examples as HTML when entering document mode', () => {
+    const {model} = setup(); const raw = '路径为 `build/<version>/`，示例 `[^1]`。\n';
+    const tab = model.openFile(file('examples.md',raw)); expect(tab.unsupported).toBeNull();
+    model.selectMode('reading'); expect(model.selectMode('document')).toBe(true); expect(model.markdown(tab)).toBe(raw);
+    useSettings.setState({markdownMode:'document'});
+  });
+});
+
+it('rebases wiki links on Save As without rewriting examples or aliases', () => {
+  const raw = '[[child#章节|别名]]\n\n![[assets/a b.png]]\n\n`[[example]]`\n\n```md\n[[literal]]\n```\n';
+  const output = rebaseSourceContent(raw, '/notes/a.md', '/other/b.md');
+  expect(output).toContain('[[../notes/child.md#章节|别名]]');
+  expect(output).toContain('![[../notes/assets/a%20b.png]]');
+  expect(output).toContain('`[[example]]`'); expect(output).toContain('[[literal]]');
+});
+
+it('preserves exact raw formatting when saving a clean reading document as another file', async () => {
+  const {model,gateway} = setup(); const raw = '\uFEFF# Heading\r\n\r\n*one*  and   **two**\r\n\r\n\r\n';
+  const tab = model.openFile(file('format.md',raw)); model.selectMode('reading');
+  await model.save(tab.id,true); expect(gateway.saveDocument.mock.calls[0][1]).toBe(raw);
+  expect(model.markdown(tab)).toBe(raw); expect(tab.dirty).toBe(false);
+  useSettings.setState({markdownMode:'document'});
+});
+
+it('retains rich undo history through reading then a no-edit source round trip', () => {
+  const {model} = setup(); const tab = model.openFile(file('undo.md','# 标题\n\n原文\n'));
+  tab.editor!.commands.insertContentAt(tab.editor!.state.doc.content.size - 1,'新增'); const editor = tab.editor;
+  model.selectMode('reading'); model.selectMode('source'); model.selectMode('reading'); model.selectMode('document');
+  expect(tab.editor).toBe(editor); tab.editor!.commands.undo(); expect(model.markdown(tab)).toBe(tab.raw); expect(tab.dirty).toBe(false);
+  useSettings.setState({markdownMode:'document'});
+});
+it('recovers source-owned drafts saved while reading without stale rich content', async () => {
+  const {model,make,drafts} = setup(); await model.startReliability();
+  const tab = model.openFile(file('draft.md','#  标题\n\n原文\n')); model.selectMode('source'); insert(model,'\n未保存源码');
+  const content = model.markdown(tab); model.selectMode('reading'); await model.flushDrafts(); expect(drafts()[0].document).toBeNull(); model.dispose();
+  const restored = make(); await restored.startReliability(); await restored.recoverDraft(tab.draftId);
+  expect(restored.active!.reading).toBe(true); expect(restored.markdown(restored.active!)).toBe(content);
+  restored.selectMode('document'); expect(restored.active!.editor!.getText()).toContain('未保存源码');
+  useSettings.setState({markdownMode:'document'});
 });

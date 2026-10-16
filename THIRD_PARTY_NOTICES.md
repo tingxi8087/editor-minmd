@@ -11,6 +11,9 @@
 | Tabler Icons | MIT | https://github.com/tabler/tabler-icons |
 | Lowlight / Highlight.js | MIT / BSD-3-Clause | https://github.com/wooorm/lowlight / https://github.com/highlightjs/highlight.js |
 | Mermaid | MIT | https://github.com/mermaid-js/mermaid |
+| Markdown-it / markdown-it-footnote / markdown-it-container | MIT | https://github.com/markdown-it |
+| KaTeX | MIT | https://github.com/KaTeX/KaTeX |
+| DOMPurify | Apache-2.0 OR MPL-2.0 | https://github.com/cure53/DOMPurify |
 | Zustand | MIT | https://github.com/pmndrs/zustand |
 | Lodash | MIT | https://github.com/lodash/lodash |
 | Tauri / Tauri plugins | MIT OR Apache-2.0 | https://github.com/tauri-apps/tauri / https://github.com/tauri-apps/plugins-workspace |

@@ -8,6 +8,7 @@ export const files = {
   openDocument: () => invoke<DocumentFile | null>("open_document"),
   saveDocument: (path: string | null, content: string, expectedContent: string | null, saveAs: boolean, protectedPaths: string[], resources?: ResourceSaveContext, suggestedName?: string) =>
     invoke<DocumentFile | null>("save_document", { request: { path, content, expectedContent, saveAs, protectedPaths, resources, suggestedName } }),
+  readEmbed: (document: string, reference: string) => invoke<DocumentFile>("read_embedded_document", { document, reference }),
   loadImage: (document: string, reference: string) => invoke<string>("load_document_image", { document, reference }),
   importImage: (document: string, source?: string, data?: number[], name?: string) => invoke<{ reference: string; name: string } | null>("import_document_image", { document, source, data, name }),
   chooseMarkdownReference: (document: string) => invoke<{ reference: string; name: string } | null>("choose_markdown_reference", { document }),
@@ -21,4 +22,4 @@ export const files = {
   trashEntry: (root: string, path: string, expected: { path: string; content: string }[]) => invoke<void>("trash_workspace_entry", { root, path, expected }),
   closeDirectory: () => invoke<void>("close_directory"),
 };
-export type FileGateway = Omit<typeof files, 'chooseMarkdownReference'>;
+export type FileGateway = Omit<typeof files, 'chooseMarkdownReference' | 'readEmbed'> & { readEmbed?: typeof files.readEmbed };

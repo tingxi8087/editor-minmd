@@ -154,13 +154,13 @@ export class WorkspaceModel {
     const unsupported = kind === "markdown" ? unsupportedMarkdown(envelope.body) : null;
     const tab: DocumentTab = {
       id: `document-${++this.sequence}`, draftId: crypto.randomUUID(), draftVersion: 0, protectedDraftVersion: -1, updatedAt: Date.now(), external: null, retainedPaths: [], name, path, resourceBase: path, raw, envelope, guide,
-      kind, mode: kind === 'text' || unsupported || initialMode === 'source' ? 'source' : 'document', authority: 'source',
+      kind, mode: kind === 'text' || (unsupported && initialMode !== 'reading') || initialMode === 'source' ? 'source' : 'document', authority: 'source',
       source: null, sourceText: raw, richSource: raw, richBasis: '', richBasisText: raw, wrap: false,
       unsupported, editor: null, baseline: "",
-      dirty: false, reading: kind === "markdown" && !unsupported && initialMode === "reading", scrollTop: 0, status: "",
+      dirty: false, reading: kind === "markdown" && initialMode === "reading", scrollTop: 0, status: "",
     };
     this.attachEditor(tab);
-    if (tab.mode === "source") this.attachSource(tab);
+    if (tab.mode === "source" || tab.unsupported) this.attachSource(tab);
     this.tabs.push(tab); this.activeId = tab.id; this.error = ""; this.changed();
     return tab;
   }
@@ -219,7 +219,7 @@ export class WorkspaceModel {
     const tab = this.add(name, "", null, false, kind);
     tab.envelope.trailingNewline = true;
     requestAnimationFrame(() => {
-      if (!this.disposed && this.activeId === tab.id) tab.mode === "source" ? tab.source?.focus() : tab.editor?.commands.focus(undefined, { scrollIntoView: false });
+      if (!this.disposed && this.activeId === tab.id) tab.mode === "source" ? tab.source?.focus() : tab.editor?.view.focus();
     });
     return tab;
   }
@@ -252,17 +252,20 @@ export class WorkspaceModel {
   }
   private applyMode(tab: DocumentTab | null, mode: 'document' | 'source', reading = false) {
     if (!tab || (tab.kind !== 'markdown' && mode !== 'source')) return false;
-    if (mode === 'document' && tab.mode === 'document' && tab.editor) { tab.reading = reading; this.changed(); return true; }
+    if (mode === 'document' && reading) {
+      tab.reading = true; tab.mode = 'document'; this.error = ''; this.changed(); return true;
+    }
+    if (mode === 'document' && tab.mode === 'document' && tab.editor && (tab.authority === 'rich' || tab.richSource === this.markdown(tab))) { tab.reading = reading; this.changed(); return true; }
     if (mode === 'source') {
       const content = this.markdown(tab);
-      if (tab.mode === 'document') tab.richSource = content;
+      if (tab.mode === 'document' && (!tab.reading || tab.authority === 'rich')) tab.richSource = content;
       tab.sourceText = content; tab.authority = 'source';
       if (!tab.source || tab.source.text() !== content) this.attachSource(tab);
       tab.mode = mode; tab.reading = false;
     } else {
       const content = this.markdown(tab); const envelope = unpackMarkdown(content);
       const unsupported = unsupportedMarkdown(envelope.body);
-      if (unsupported) { tab.unsupported = unsupported; this.reportError(`正文包含${unsupported}，请继续在源码模式编辑；保存会保留源码。`); return false; }
+      if (unsupported) { tab.unsupported = unsupported; this.reportError(`正文包含${unsupported}，暂不支持文档编辑；可切换阅读查看，或在源码模式编辑。`); return false; }
       if (!tab.editor || tab.richSource !== content) {
         let baseline = tab.baseline;
         if (baseline && tab.path && tab.resourceBase) baseline = JSON.stringify(mapReferences(JSON.parse(baseline), value => rebaseReference(value, tab.resourceBase!, tab.path!)));
@@ -276,17 +279,17 @@ export class WorkspaceModel {
       tab.mode = mode; tab.reading = reading;
     }
     this.error = ''; this.changed();
-    requestAnimationFrame(() => { if (!this.disposed && this.activeId === tab.id && tab.mode === mode) { if (mode === 'source') tab.source?.focus(); else tab.editor?.commands.focus(undefined, { scrollIntoView: false }); } });
+    requestAnimationFrame(() => { if (!this.disposed && this.activeId === tab.id && tab.mode === mode) { if (mode === 'source') tab.source?.focus(); else tab.editor?.view.focus(); } });
     return true;
   }
-  // One Markdown view preference applies to every tab. Unsupported syntax remains
-  // in source so a global view change cannot silently lose file contents.
+  // One view preference applies to all Markdown tabs. Protected syntax may be
+  // read independently; only rich editing needs a safe conversion.
   selectMode(mode: MarkdownMode) {
     if (this.active?.kind !== "markdown" || !this.setMode(mode === "source" ? "source" : "document", mode === "reading")) return false;
     useSettings.getState().setMarkdownMode(mode);
     for (const tab of this.tabs) {
       if (tab === this.active || tab.kind !== "markdown") continue;
-      if (mode !== "source" && unsupportedMarkdown(unpackMarkdown(this.markdown(tab)).body)) continue;
+      if (mode === "document" && unsupportedMarkdown(unpackMarkdown(this.markdown(tab)).body)) continue;
       this.applyMode(tab, mode === "source" ? "source" : "document", mode === "reading");
     }
     return true;
@@ -327,6 +330,17 @@ export class WorkspaceModel {
     } catch (error) { this.error = String(error); }
     finally { this.busy = false; this.changed(); }
   }
+  async readingImage(id: string, reference: string) {
+    const tab = this.tabs.find(item => item.id === id);
+    if (!tab?.resourceBase) throw new Error("请先保存文档");
+    return this.gateway.loadImage(tab.resourceBase, reference);
+  }
+  async readingEmbed(id: string, reference: string) {
+    const tab = this.tabs.find(item => item.id === id);
+    if (!tab?.resourceBase) throw new Error("请先保存文档");
+    if (!this.gateway.readEmbed) throw new Error("当前环境不支持嵌入文档");
+    return this.gateway.readEmbed(tab.resourceBase, reference);
+  }
   async openLink(id: string, href: string) {
     const tab = this.tabs.find(item => item.id === id);
     if (!tab || this.busy || this.closing || !validLink(href)) { if (!validLink(href)) this.reportError("链接地址不可用"); return; }
@@ -345,6 +359,9 @@ export class WorkspaceModel {
   private jumpToAnchor(tab: DocumentTab, anchor: string) {
     let decoded: string; try { decoded = decodeURIComponent(anchor); } catch { this.reportError("无效的标题锚点"); return; }
     const slug = (text: string) => text.trim().toLowerCase().replace(/[^\p{L}\p{N}_\-\s]/gu, "").replace(/\s/g, "-");
+    if (tab.reading) {
+      document.getElementById(`${tab.id}-${decoded}`)?.scrollIntoView?.({ block: "start" }); return;
+    }
     let found = false; const counts = new Map<string, number>();
     tab.editor?.state.doc.descendants((node, position) => {
       if (node.type.name !== "heading") return;
@@ -393,7 +410,7 @@ export class WorkspaceModel {
       let content = this.markdown(tab);
       let resources: import("@/lib/files").ResourceSaveContext | undefined;
       if (saveAs && tab.kind === "markdown" && (tab.path || tab.resourceBase)) {
-        if (tab.mode === "source" || !tab.editor) {
+        if (tab.mode === "source" || (tab.reading && tab.authority === "source") || !tab.editor) {
           const prepared = sourceReferenceTokens(content);
           if (prepared.references.length) { content = prepared.content; resources = { basePath: tab.path ?? tab.resourceBase!, references: prepared.references }; }
         } else if (tab.editor) {
@@ -411,7 +428,7 @@ export class WorkspaceModel {
       this.diskGeneration++;
       tab.external = null;
       tab.path = saved.path; tab.name = saved.name; tab.raw = saved.content; tab.envelope = unpackMarkdown(saved.content);
-      if (tab.mode === 'source') {
+      if (tab.mode === 'source' || (tab.reading && tab.authority === 'source')) {
         if (tab.resourceBase && tab.resourceBase !== saved.path) tab.retainedPaths.push(tab.resourceBase);
         tab.resourceBase = saved.path;
         if (tab.sourceText !== saved.content) { tab.sourceText = saved.content; this.attachSource(tab); tab.richSource = ''; }
@@ -585,7 +602,7 @@ export class WorkspaceModel {
       else { const editor = tab.editor as Editor | null; editor?.commands.setTextSelection(Math.min(Math.max(1, draft.selection), Math.max(1, editor.state.doc.content.size - 1))); }
       tab.draftVersion++; tab.dirty = true; tab.scrollTop = draft.scrollTop;
       const preferred = preferredMarkdownMode();
-      if (tab.kind === "markdown" && (preferred === "source" || !tab.unsupported)) this.applyMode(tab, preferred === "source" ? "source" : "document", preferred === "reading");
+      if (tab.kind === "markdown" && (preferred !== "document" || !tab.unsupported)) this.applyMode(tab, preferred === "source" ? "source" : "document", preferred === "reading");
       tab.status = "已恢复草稿，请检查后保存";
       if (!duplicate && disk && (disk.kind !== "present" || disk.content !== draft.raw)) tab.external = disk;
       this.pendingDrafts = this.pendingDrafts.filter(item => item.id !== id);
@@ -635,7 +652,8 @@ export class WorkspaceModel {
     tab.resourceBase = tab.path; tab.raw = content; tab.sourceText = content; tab.authority = 'source'; tab.envelope = unpackMarkdown(content);
     tab.unsupported = tab.kind === 'markdown' ? unsupportedMarkdown(tab.envelope.body) : null; tab.external = null; tab.dirty = false;
     const editor = this.attachEditor(tab);
-    if (tab.kind === 'text' || tab.unsupported) tab.mode = 'source';
+    if (tab.kind === 'text' || (tab.unsupported && !tab.reading)) tab.mode = 'source';
+    if (tab.unsupported && tab.reading) this.attachSource(tab);
     if (tab.mode === 'source') { this.attachSource(tab); tab.source!.select(selection); tab.source!.scrollTop = sourceScroll; }
     else editor?.commands.setTextSelection(Math.min(selection, Math.max(1, editor.state.doc.content.size - 1)));
     if (editor) { tab.baseline = JSON.stringify(editor.getJSON()); tab.richBasis = tab.baseline; }

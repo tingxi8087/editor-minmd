@@ -1,3 +1,5 @@
+import MarkdownReader from "@/components/MarkdownReader";
+import type { ReaderHeading } from "@/components/MarkdownReader/render";
 import WorkspaceSidebar from "@/components/WorkspaceSidebar";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
@@ -127,6 +129,7 @@ export function Workspace({
   }, [background]);
   useSyncExternalStore(workspace.subscribe, workspace.snapshot);
   const { dark, sidebar, toggleDark, toggleSidebar } = useSettings();
+  const [readerHeadings, setReaderHeadings] = useState<ReaderHeading[]>([]);
   const [findOpen, setFindOpen] = useState(false);
   const [findRequest, setFindRequest] = useState(0);
   const [pane, setPane] = useState<"files" | "outline">("outline");
@@ -375,7 +378,7 @@ export function Workspace({
         )
         .catch(() => {});
   }, [dirty, session?.name]);
-  const headings: { text: string; level: number; position: number }[] = [];
+  const headings: { id?: string; text: string; level: number; position: number }[] = [];
   editor?.state.doc.descendants((node, position) => {
     if (node.type.name === "heading")
       headings.push({
@@ -384,10 +387,11 @@ export function Workspace({
         position,
       });
   });
+  if (reading) headings.splice(0, headings.length, ...readerHeadings);
   const wordCount =
     (session?.mode === "source"
       ? session.source?.state.doc.toString()
-      : editor?.getText()
+      : reading && session ? workspace.markdown(session) : editor?.getText()
     )?.replace(/\s/g, "").length ?? 0;
   const tools = [
     {
@@ -672,7 +676,7 @@ export function Workspace({
                         paddingLeft: 12 + Math.max(0, heading.level - 1) * 8,
                       }}
                       onClick={() => {
-                        const element = editor?.view.nodeDOM(heading.position);
+                        const element = reading && heading.id ? document.getElementById(heading.id) : editor?.view.nodeDOM(heading.position);
                         if (element instanceof HTMLElement)
                           element.scrollIntoView({
                             behavior: "smooth",
@@ -826,7 +830,7 @@ export function Workspace({
             </div>
           )}
           <SourceToolbar workspace={workspace} />
-          {findOpen && session?.mode === "document" && (
+          {findOpen && session?.mode === "document" && !reading && (
             <DocumentSearch
               key={session.id}
               editor={editor}
@@ -856,12 +860,12 @@ export function Workspace({
               aria-labelledby={`tab-${tab.id}`}
               hidden={tab.id !== workspace.activeId}
             >
-              {tab.mode === "source" && tab.unsupported && (
+              {tab.mode === "source" && tab.unsupported && !workspace.error && (
                 <div className="notice-banner">
-                  包含{tab.unsupported}，可在源码模式完整编辑和保存。
+                  包含{tab.unsupported}，可切换阅读查看，或在源码模式完整编辑和保存。
                 </div>
               )}
-              <div className="editor-surface" hidden={tab.mode !== "document"}>
+              <div className="editor-surface" hidden={tab.mode !== "document" || tab.reading}>
                 <DocumentEditor
                   editor={tab.editor}
                   active={
@@ -873,6 +877,15 @@ export function Workspace({
                   }}
                 />
               </div>
+              {tab.mode === "document" && tab.reading && <div className="editor-surface reader-surface">
+                <MarkdownReader markdown={workspace.markdown(tab)} id={tab.id} base={tab.resourceBase}
+                  active={tab.id === workspace.activeId} dark={dark} scrollTop={tab.scrollTop}
+                  onScroll={position => { tab.scrollTop = position; }} onHeadings={setReaderHeadings}
+                  onLink={reference => void workspace.openLink(tab.id, reference)}
+                  loadImage={reference => workspace.readingImage(tab.id, reference)}
+                  loadEmbed={reference => workspace.readingEmbed(tab.id, reference)}
+                  findOpen={findOpen} findRequest={findRequest} onCloseFind={() => setFindOpen(false)} />
+              </div>}
               {tab.source && (
                 <div className="editor-surface" hidden={tab.mode !== "source"}>
                   <SourceEditor
