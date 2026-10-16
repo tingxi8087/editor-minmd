@@ -35,24 +35,24 @@ it('rejects invalid versions before changing any generated version', async () =>
 });
 const fixture = async () => {
   const dir = await root(); const bundles = join(dir, 'cargo/bundle');
-  await mkdir(join(bundles, 'macos/MinMD.app/Contents/MacOS'), { recursive: true });
-  await writeFile(join(bundles, 'macos/MinMD.app/Contents/MacOS/minmd'), 'executable', { mode: 0o755 });
-  if (process.platform !== 'win32') await symlink('minmd', join(bundles, 'macos/MinMD.app/Contents/MacOS/link'));
-  await mkdir(join(bundles, 'dmg')); await writeFile(join(bundles, 'dmg/MinMD_1.2.3.dmg'), 'installer');
+  await mkdir(join(bundles, 'macos/editor-minmd.app/Contents/MacOS'), { recursive: true });
+  await writeFile(join(bundles, 'macos/editor-minmd.app/Contents/MacOS/minmd'), 'executable', { mode: 0o755 });
+  if (process.platform !== 'win32') await symlink('minmd', join(bundles, 'macos/editor-minmd.app/Contents/MacOS/link'));
+  await mkdir(join(bundles, 'dmg')); await writeFile(join(bundles, 'dmg/editor-minmd_1.2.3.dmg'), 'installer');
   return { dir, bundles };
 };
 it('exports apps and installers under the version and target with a manifest and portable archive', async () => {
   const { dir, bundles } = await fixture();
   const destination = await exportBundles({ root: dir, bundleDirectory: bundles, version: '1.2.3', target: 'aarch64-apple-darwin', zipApp: async (_app: string, archive: string) => writeFile(archive, 'zip') });
   expect(destination).toBe(join(dir, 'build/1.2.3/aarch64-apple-darwin'));
-  expect(await readFile(join(destination, 'MinMD_1.2.3.dmg'), 'utf8')).toBe('installer');
+  expect(await readFile(join(destination, 'editor-minmd_1.2.3.dmg'), 'utf8')).toBe('installer');
   if (process.platform !== 'win32') {
-    expect(await readlink(join(destination, 'MinMD.app/Contents/MacOS/link'))).toBe('minmd');
-    expect((await stat(join(destination, 'MinMD.app/Contents/MacOS/minmd'))).mode & 0o111).not.toBe(0);
+    expect(await readlink(join(destination, 'editor-minmd.app/Contents/MacOS/link'))).toBe('minmd');
+    expect((await stat(join(destination, 'editor-minmd.app/Contents/MacOS/minmd'))).mode & 0o111).not.toBe(0);
   }
   const manifest = JSON.parse(await readFile(join(destination, 'build-info.json'), 'utf8'));
   expect(manifest.version).toBe('1.2.3'); expect(manifest.profile).toBe('release');
-  expect(manifest.files).toContain('MinMD_1.2.3_aarch64-apple-darwin.zip');
+  expect(manifest.files).toContain('editor-minmd_1.2.3_aarch64-apple-darwin.zip');
 });
 it('preserves the last successful export when archiving fails, and isolates debug and other versions', async () => {
   const { dir, bundles } = await fixture();

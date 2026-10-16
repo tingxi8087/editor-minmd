@@ -1,4 +1,4 @@
-# MinMD · 纸墨
+# editor-minmd
 
 MIT 开源的本地 Markdown 桌面编辑器。使用 Tauri 2、React、Tiptap、CodeMirror 6 和 Paper Ink。
 
@@ -32,7 +32,7 @@ npm test
 
 版本只修改根目录 `package.json` 的 `version`。启动和构建自动同步 Cargo、npm 锁文件中的本项目版本；Tauri 直接读取该文件。无需分别手改版本号。
 
-当前 macOS Apple Silicon 产物示例：`build/0.1.0/aarch64-apple-darwin/`，含 `MinMD.app`、DMG、应用 ZIP 和 `build-info.json`。调试分发包可执行 `npm run build -- --debug --bundles app`，存到对应 `*-debug/` 子目录。`build/` 已忽略，不提交 Git。
+当前 macOS Apple Silicon 产物示例：`build/0.1.0/aarch64-apple-darwin/`，含 `editor-minmd.app`、DMG、应用 ZIP 和 `build-info.json`。调试分发包可执行 `npm run build -- --debug --bundles app`，存到对应 `*-debug/` 子目录。`build/` 已忽略，不提交 Git。
 
 当前为本地构建，未做 Developer ID 签名和公证。完整脚本、目录与验证范围见[开发与桌面打包](doc/build.md)。
 
@@ -82,7 +82,7 @@ npm test
 
 ## 许可
 
-项目源码按 [MIT](LICENSE) 发布。编辑交互参考 MinMD 文档编辑器；第三方依赖保持各自许可，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+项目源码按 [MIT](LICENSE) 发布。编辑交互参考 minmd 文档编辑器；第三方依赖保持各自许可，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 代码块语言搜索、删除与表格行列/对齐/列宽操作见[交互说明](doc/block-interactions.md)。
 

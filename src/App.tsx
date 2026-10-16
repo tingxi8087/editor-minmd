@@ -20,7 +20,7 @@ import { desktopAvailable } from "@/lib/files";
 import { WorkspaceModel } from "@/workspace/model";
 import { useSettings } from "@/store/settings";
 
-const guide = `# 从一页空白开始。\n\n把想法写下来，让文字回到文字。\n\nMinMD 是一个本地 Markdown 编辑器。打开你的文档，直接编辑排版后的内容，再保存回原来的文件。\n\n## 像写文档一样，写 Markdown\n\n不必来回切换编辑与预览。标题、列表、引用和代码，都在纸面上自然呈现。\n\n- 用 **粗体** 标出重点，用 *斜体* 留一点语气。\n- 输入 \`#\` 再按空格，开始一个标题。\n- 输入 \`-\` 再按空格，整理一份清单。\n\n> 简单的工具，留出更多思考的空间。\n\n## 留在本地，随时继续\n\n你的文档仍是普通的 Markdown 文件。不需要账号，也不需要上传。\n\n| 操作 | 快捷键 |\n| --- | --- |\n| 打开 Markdown | ⌘ / Ctrl + O |\n| 保存文档 | ⌘ / Ctrl + S |\n| 新建 MD | ⌘ / Ctrl + N |\n\n---\n\n点击右上角的「打开文件」，或新建一页，开始写作。\n`;
+const guide = `# 从一页空白开始。\n\n把想法写下来，让文字回到文字。\n\neditor-minmd 是一个本地 Markdown 编辑器。打开你的文档，直接编辑排版后的内容，再保存回原来的文件。\n\n## 像写文档一样，写 Markdown\n\n不必来回切换编辑与预览。标题、列表、引用和代码，都在纸面上自然呈现。\n\n- 用 **粗体** 标出重点，用 *斜体* 留一点语气。\n- 输入 \`#\` 再按空格，开始一个标题。\n- 输入 \`-\` 再按空格，整理一份清单。\n\n> 简单的工具，留出更多思考的空间。\n\n## 留在本地，随时继续\n\n你的文档仍是普通的 Markdown 文件。不需要账号，也不需要上传。\n\n| 操作 | 快捷键 |\n| --- | --- |\n| 打开 Markdown | ⌘ / Ctrl + O |\n| 保存文档 | ⌘ / Ctrl + S |\n| 新建 MD | ⌘ / Ctrl + N |\n\n---\n\n点击右上角的「打开文件」，或新建一页，开始写作。\n`;
 const iconProps = { size: 17, stroke: 1.65 };
 
 export function Workspace({ workspace, background: suppliedBackground }: { workspace: WorkspaceModel; background?: BackgroundModel }) {
@@ -107,7 +107,7 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
     return () => { disposed = true; off?.(); menuOff?.(); dropOff?.(); window.removeEventListener("keydown", sidebarKeydown, true); window.removeEventListener("keydown", keydown); window.removeEventListener("beforeunload", unload); };
   }, [workspace, background, associationBusy]);
   useEffect(() => {
-    if (desktopAvailable) void getCurrentWindow().setTitle(`${dirty ? "● " : ""}${session?.name ?? "MinMD"} — MinMD`).catch(() => {});
+    if (desktopAvailable) void getCurrentWindow().setTitle(`${dirty ? "● " : ""}${session?.name ?? "editor-minmd"} — editor-minmd`).catch(() => {});
   }, [dirty, session?.name]);
   const headings: { text: string; level: number; position: number }[] = [];
   editor?.state.doc.descendants((node, position) => { if (node.type.name === "heading") headings.push({ text: node.textContent || "未命名标题", level: node.attrs.level as number, position }); });

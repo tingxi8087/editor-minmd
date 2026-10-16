@@ -53,10 +53,10 @@ it('locks selection and closing while applying and reports failures per extensio
   expect(screen.getByText('0/1 项已设为默认')).toBeTruthy();
 });
 it('reports native errors and unsupported systems without claiming success', async () => {
-  const { gateway, user } = setup(); vi.mocked(gateway.apply).mockRejectedValue('请从 MinMD.app 中设置');
+  const { gateway, user } = setup(); vi.mocked(gateway.apply).mockRejectedValue('请从 editor-minmd.app 中设置');
   await waitFor(() => expect((screen.getByRole('button', { name: '设为默认打开应用' }) as HTMLButtonElement).disabled).toBe(false));
   await user.click(screen.getByRole('button', { name: '设为默认打开应用' }));
-  expect((await screen.findByRole('alert')).textContent).toContain('MinMD.app');
+  expect((await screen.findByRole('alert')).textContent).toContain('editor-minmd.app');
   cleanup(); setup(false); expect(await screen.findByText('目前仅支持 macOS 桌面应用。')).toBeTruthy();
   expect((screen.getByRole('button', { name: '设为默认打开应用' }) as HTMLButtonElement).disabled).toBe(true);
 });

@@ -39,7 +39,7 @@ try {
     const destination = await exportBundles({ root: projectRoot, bundleDirectory, version, target, debug,
       zipApp: process.platform === 'darwin' ? (source, archive) => run('/usr/bin/ditto', ['-c', '-k', '--sequesterRsrc', '--keepParent', source, archive]) : undefined,
     });
-    console.log(`\nMinMD ${version} 桌面产物：${destination}`);
+    console.log(`\neditor-minmd ${version} 桌面产物：${destination}`);
   }
 } catch (error) {
   console.error(`\n${error.message}`);

@@ -267,7 +267,7 @@ pub fn run() {
             workspace::trash_workspace_entry
         ])
         .build(tauri::generate_context!())
-        .expect("无法启动 MinMD")
+        .expect("无法启动 editor-minmd")
         .run(|app, event| {
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = event {

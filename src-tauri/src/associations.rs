@@ -160,7 +160,7 @@ mod platform {
             .ancestors()
             .nth(3)
             .filter(|p| p.extension().is_some_and(|e| e == "app"))
-            .ok_or("请从已构建的 MinMD.app 中设置默认打开方式，建议先将应用放入「应用程序」")?;
+            .ok_or("请从已构建的 editor-minmd.app 中设置默认打开方式，建议先将应用放入「应用程序」")?;
         let url = CFURL::from_path(bundle_path, true).ok_or("无法取得应用位置")?;
         let status = unsafe { LSRegisterURL(url.as_concrete_TypeRef(), 1) };
         if status != 0 {
@@ -175,7 +175,7 @@ mod platform {
                     row.content_type = Some(kind.to_string());
                     let text = CFString::new("public.text");
                     if unsafe { UTTypeConformsTo(kind.as_concrete_TypeRef(), text.as_concrete_TypeRef()) } == 0 {
-                        row.message = format!("系统将此扩展名识别为 {}，未修改非文本类型的关联；请使用访达右键「打开方式」选择 MinMD", kind);
+                        row.message = format!("系统将此扩展名识别为 {}，未修改非文本类型的关联；请使用访达右键「打开方式」选择 editor-minmd", kind);
                         return row;
                     }
                     let status = unsafe { LSSetDefaultRoleHandlerForContentType(kind.as_concrete_TypeRef(), u32::MAX, bundle.as_concrete_TypeRef()) };

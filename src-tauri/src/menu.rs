@@ -12,19 +12,19 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         &[
             &Submenu::with_items(
                 app,
-                "MinMD",
+                "editor-minmd",
                 true,
                 &[
-                    &PredefinedMenuItem::about(app, Some("关于 MinMD"), None)?,
+                    &PredefinedMenuItem::about(app, Some("关于 editor-minmd"), None)?,
                     &action("associations", "默认打开方式…", Some("CmdOrCtrl+,"))?,
                     #[cfg(target_os = "macos")]
                     &PredefinedMenuItem::services(app, Some("服务"))?,
                     #[cfg(target_os = "macos")]
-                    &PredefinedMenuItem::hide(app, Some("隐藏 MinMD"))?,
+                    &PredefinedMenuItem::hide(app, Some("隐藏 editor-minmd"))?,
                     #[cfg(target_os = "macos")]
                     &PredefinedMenuItem::hide_others(app, Some("隐藏其他"))?,
                     &PredefinedMenuItem::separator(app)?,
-                    &action("quit", "退出 MinMD", Some("CmdOrCtrl+Q"))?,
+                    &action("quit", "退出 editor-minmd", Some("CmdOrCtrl+Q"))?,
                 ],
             )?,
             &Submenu::with_items(

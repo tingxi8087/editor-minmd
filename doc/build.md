@@ -34,9 +34,9 @@ Tauri 的 `beforeDevCommand`、`beforeBuildCommand` 分别调用 `dev:web`、`bu
 build/
 └── 0.1.0/
     └── aarch64-apple-darwin/
-        ├── MinMD.app
-        ├── MinMD_0.1.0_aarch64.dmg
-        ├── MinMD_0.1.0_aarch64-apple-darwin.zip
+        ├── editor-minmd.app
+        ├── editor-minmd_0.1.0_aarch64.dmg
+        ├── editor-minmd_0.1.0_aarch64-apple-darwin.zip
         └── build-info.json
 ```
 
