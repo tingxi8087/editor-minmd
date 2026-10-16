@@ -51,6 +51,57 @@ fn read_image(path: &Path) -> Result<Vec<u8>, String> {
     image_kind(&data)?;
     Ok(data)
 }
+fn markdown_reference(document: &Path, target: &Path) -> Result<ImportedImage, String> {
+    let target = target
+        .canonicalize()
+        .map_err(|e| format!("文件不存在或不可访问：{e}"))?;
+    if !matches!(
+        target
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase()
+            .as_str(),
+        "md" | "markdown" | "mdown"
+    ) {
+        return Err("请选择 Markdown 文件".into());
+    }
+    // A reference must also be openable by this editor; reject binary/invalid UTF-8.
+    let selected = read_document(&target)?;
+    let base = Url::from_directory_path(document.parent().ok_or("无效的文档位置")?)
+        .map_err(|_| "无效的文档路径")?;
+    let url = Url::from_file_path(&target).map_err(|_| "无效的目标路径")?;
+    let reference = base
+        .make_relative(&url)
+        .unwrap_or_else(|| url.to_string())
+        .replace('(', "%28")
+        .replace(')', "%29");
+    Ok(ImportedImage {
+        reference,
+        name: selected.name,
+    })
+}
+#[tauri::command]
+pub async fn choose_markdown_reference(
+    app: tauri::AppHandle,
+    document: String,
+) -> Result<Option<ImportedImage>, String> {
+    let base = authorized(&app.state::<OpenedFiles>(), &document)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(file) = app
+            .dialog()
+            .file()
+            .add_filter("Markdown", &["md", "markdown", "mdown"])
+            .blocking_pick_file()
+        else {
+            return Ok(None);
+        };
+        let target = file.into_path().map_err(|e| e.to_string())?;
+        markdown_reference(&base, &target).map(Some)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
 #[tauri::command]
 pub async fn load_document_image(
     document: String,
@@ -243,6 +294,34 @@ pub async fn open_document_link(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn markdown_reference_uses_portable_encoded_paths_and_validates_content() {
+        let dir = tempfile::tempdir().unwrap();
+        let nested = dir.path().join("子目录");
+        fs::create_dir(&nested).unwrap();
+        let target = nested.join("中文 # (1).md");
+        fs::write(&target, "# 文档").unwrap();
+        let document = dir.path().join("来源.md");
+        let selected = markdown_reference(&document, &target).unwrap();
+        assert_eq!(selected.name, "中文 # (1).md");
+        assert!(!selected.reference.starts_with("file:"));
+        assert!(selected.reference.contains("%23"));
+        assert!(selected.reference.contains("%28"));
+        assert_eq!(
+            resolve(&document, &selected.reference)
+                .unwrap()
+                .to_file_path()
+                .unwrap(),
+            target.canonicalize().unwrap()
+        );
+        let binary = nested.join("bad.md");
+        fs::write(&binary, [0, 1, 0]).unwrap();
+        assert!(markdown_reference(&document, &binary).is_err());
+        let other = nested.join("other.txt");
+        fs::write(&other, "text").unwrap();
+        assert!(markdown_reference(&document, &other).is_err());
+        assert!(markdown_reference(&document, &nested.join("missing.md")).is_err());
+    }
     #[test]
     fn imports_unique_raster_images_and_preserves_original() {
         let dir = tempfile::tempdir().unwrap();

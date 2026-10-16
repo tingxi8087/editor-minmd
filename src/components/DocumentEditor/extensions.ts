@@ -5,15 +5,15 @@ import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import { LocalImage, type ResourceContext } from "./localImage";
 import Placeholder from "@tiptap/extension-placeholder";
-import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import { RichCodeBlock } from "./codeBlock";
 import { common, createLowlight } from "lowlight";
 const lowlight = createLowlight(common);
 export const editorExtensions = (resources?: ResourceContext) => [
   StarterKit.configure({ codeBlock: false, underline: false, link: { openOnClick: false, autolink: false, protocols: ["file"] } }),
-  CodeBlockLowlight.configure({ lowlight, defaultLanguage: "plaintext" }),
+  RichCodeBlock.configure({ lowlight, defaultLanguage: "plaintext" }),
   TableKit.configure({ table: { resizable: false } }),
   TaskList, TaskItem.configure({ nested: true }),
   LocalImage.configure({ allowBase64: false, resolve: resources?.image ?? (async (src: string) => src) }),
-  Placeholder.configure({ placeholder: "写下第一行，或输入 # 空格创建标题…" }),
+  Placeholder.configure({ placeholder: "写下第一行，输入 / 插入内容…" }),
   Markdown,
 ];

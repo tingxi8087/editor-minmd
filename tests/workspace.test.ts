@@ -199,6 +199,33 @@ describe('directory workspaces', () => {
 });
 
 describe('Markdown images and links', () => {
+  it('stops slash image insertion when an untitled Markdown is saved as a text file', async () => {
+    const { model, gateway } = setup(); const tab = model.create()!; tab.editor!.commands.setContent('<p>/image</p>');
+    gateway.saveDocument.mockResolvedValueOnce({ path: '/notes/text.txt', name: 'text.txt', content: '/image\n' });
+    await model.insertImages(tab.id, undefined, undefined, { from: 1, to: 7 });
+    expect(tab.mode).toBe('source'); expect(tab.editor).toBeNull(); expect(gateway.importImage).not.toHaveBeenCalled(); expect(model.markdown(tab)).toContain('/image');
+  });
+
+  it('replaces a slash image command only after import and restores the entire command with undo', async () => {
+    const { model, gateway } = setup(); const tab = model.openFile(file('Slash', '/image'));
+    tab.editor!.commands.setTextSelection(7);
+    gateway.importImage.mockResolvedValueOnce(null);
+    await model.insertImages(tab.id, undefined, undefined, { from: 1, to: 7 });
+    expect(tab.editor!.getText()).toBe('/image'); expect(tab.dirty).toBe(false);
+    await model.insertImages(tab.id, undefined, undefined, { from: 1, to: 7 });
+    expect(model.markdown(tab)).toContain('![粘贴图片](assets/image.png)'); expect(tab.editor!.getText()).not.toContain('/image');
+    tab.editor!.commands.undo(); expect(tab.editor!.getText()).toBe('/image');
+  });
+  it('does not replace changed text after an asynchronous slash image import', async () => {
+    const { model, gateway } = setup(); const tab = model.openFile(file('Slash', '/image'));
+    let finish!: (value: { reference: string; name: string }) => void;
+    gateway.importImage.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const pending = model.insertImages(tab.id, undefined, undefined, { from: 1, to: 7 });
+    tab.editor!.commands.insertContentAt({ from: 1, to: 7 }, 'changed');
+    finish({ reference: 'assets/image.png', name: 'image' }); await pending;
+    expect(tab.editor!.getText()).toBe('changed'); expect(model.error).toContain('位置已改变'); expect(tab.editor!.getJSON().content?.some(node => node.type === 'image')).toBe(false);
+  });
+
   it('saves an untitled document before importing an image; cancelled save imports nothing', async () => {
     const { model, gateway } = setup(); const tab = model.create()!;
     gateway.saveDocument.mockResolvedValueOnce(null);

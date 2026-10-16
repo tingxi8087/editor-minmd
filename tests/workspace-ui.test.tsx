@@ -75,6 +75,31 @@ beforeEach(() => {
 afterEach(() => { cleanup(); mounted.forEach((model) => model.dispose()); mounted.length = 0; });
 
 describe('workspace UI integration', () => {
+  it('opens slash date insertion from the real workbench and keeps one-step undo and source sync', async () => {
+    const { model, user } = setup(); await user.click(screen.getByRole('button', { name: '新建 Markdown' }));
+    const editor = model.active!.editor!;
+    act(() => { editor.commands.focus(); editor.view.focus(); editor.commands.insertContent('/date'); });
+    await user.click(await screen.findByRole('option', { name: '日期' }));
+    const dialog = await screen.findByRole('dialog'); expect(editor.getText()).toBe('/date');
+    fireEvent.change(within(dialog).getByLabelText('日期'), { target: { value: '2026-10-16' } });
+    await user.click(within(dialog).getByRole('button', { name: '插入' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull()); expect(editor.getText()).toBe('2026-10-16');
+    act(() => { editor.commands.undo(); }); expect(editor.getText()).toBe('/date');
+    act(() => { editor.commands.redo(); });
+    await user.click(screen.getByRole('button', { name: '源码' }));
+    expect(model.active!.source?.text()).toContain('2026-10-16');
+  });
+  it('routes slash image import through the existing file gateway and leaves cancelled command untouched', async () => {
+    const { model, gateway, user } = setup();
+    act(() => { model.openFile({ path: '/notes/slash.md', name: 'slash.md', content: '/image' }); });
+    const editor = model.active!.editor!;
+    act(() => { editor.commands.focus('end'); editor.view.focus(); editor.commands.setTextSelection(7); });
+    gateway.importImage.mockResolvedValueOnce(null);
+    await user.click(await screen.findByRole('option', { name: '图片' }));
+    await waitFor(() => expect(gateway.importImage).toHaveBeenCalledOnce());
+    expect(editor.getText()).toBe('/image'); expect(model.active!.dirty).toBe(false);
+  });
+
   it('opens a root, lazily expands children, opens multiple tabs and preserves edits when switching', async () => {
     const { model, gateway, user } = setup();
     await user.click(screen.getAllByRole('button', { name: '打开目录' })[0]);

@@ -12,6 +12,8 @@ import SourceToolbar from "@/components/SourceToolbar";
 import DocumentEditor from "@/components/DocumentEditor";
 import DocumentTabs from "@/components/DocumentTabs";
 import ReliabilityPanel from "@/components/ReliabilityPanel";
+import SlashMenu from "@/components/SlashMenu";
+import SlashInsert from "@/components/SlashInsert";
 import ResourceTools from "@/components/ResourceTools";
 import FileTree from "@/components/FileTree";
 import { desktopAvailable } from "@/lib/files";
@@ -27,6 +29,7 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
   const [backgroundOpen, setBackgroundOpen] = useState(false);
   const [associationsOpen, setAssociationsOpen] = useState(false);
   const [associationBusy, setAssociationBusy] = useState(false);
+  const [slashInsert, setSlashInsert] = useState<{ id: string; kind: "emoji" | "date" | "reference" | "link"; from: number; to: number } | null>(null);
   useEffect(() => { void background.load(); }, [background]);
   useSyncExternalStore(workspace.subscribe, workspace.snapshot);
   const { dark, sidebar, toggleDark, toggleSidebar } = useSettings();
@@ -175,6 +178,11 @@ export function Workspace({ workspace, background: suppliedBackground }: { works
     </div>
     <footer className="statusbar"><div><span className={`status-dot ${workspace.hasDirty ? "unsaved" : ""}`} />{busy ? "正在处理文件…" : workspace.error ? "操作未完成" : session?.guide ? "欢迎来到 MinMD" : dirty ? "当前文档有未保存的修改" : session?.status || (session?.path ? "已保存" : session ? "新文档，尚未保存" : "就绪")}{workspace.tabs.filter((tab) => tab.dirty).length > 0 && <span>共 {workspace.tabs.filter((tab) => tab.dirty).length} 份未保存</span>}</div><div>{!desktopAvailable && <span className="preview-label">浏览器预览</span>}<span>{wordCount.toLocaleString()} 字符</span><span>{session?.mode === "source" ? (session.source?.language && session.source.language !== "Plain Text" ? session.source.language : "纯文本") : "Markdown"}</span>{session?.mode === "source" && session.source && <span>行 {session.source.cursor.line}，列 {session.source.cursor.column}</span>}{workspace.recoveryReady && dirty && <span>{workspace.recoveryError ? "草稿保护失败" : session?.protectedDraftVersion === session?.draftVersion ? "草稿已保护" : "草稿保护中…"}</span>}<span>UTF-8{session?.envelope.bom && " BOM"}</span><span>{session?.envelope.newline === "\r\n" ? "CRLF" : "LF"}</span></div></footer>
 
+    {session?.mode === 'document' && <SlashMenu key={session.id} editor={editor} onInsert={(kind, range) => {
+      if (kind === 'image') void workspace.insertImages(session.id, undefined, undefined, range);
+      else setSlashInsert({ id: session.id, kind, ...range });
+    }} />}
+    <SlashInsert workspace={workspace} request={slashInsert} onClose={() => setSlashInsert(null)} />
     {associationsOpen && <AssociationSettings onBusyChange={setAssociationBusy} onClose={() => setAssociationsOpen(false)} />}
     <Modal open={!!target} title="保存这页的修改？" onCancel={() => workspace.cancelClose()} footer={<div className="leave-actions"><Button disabled={busy} onClick={() => workspace.cancelClose()}>继续编辑</Button><Button disabled={busy} danger onClick={async () => { workspace.approveClose(); if (!workspace.closeTarget) await completeClose(); }}>不保存</Button><Button type="primary" disabled={busy} onClick={async () => { if (target && await save(target.id)) { workspace.approveClose(); if (!workspace.closeTarget) await completeClose(); } }}>保存并继续</Button></div>}><p>「{target?.name}」有未保存的修改。保存后再关闭，或放弃本次修改。</p>{(workspace.closing?.remaining.length ?? 0) > 1 && <p>还有 {workspace.closing!.remaining.length} 份文档需要确认。</p>}{workspace.error && <p role="alert" className="dialog-error">{workspace.error}</p>}</Modal>
   </div>;

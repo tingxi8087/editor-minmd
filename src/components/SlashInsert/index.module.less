@@ -1,0 +1,11 @@
+.fields { display: grid; gap: 10px; font-size: 13px; label { display: grid; gap: 6px; } p { margin: 0; color: var(--secondary); font-size: 12px; } }
+.actions { display: flex; justify-content: flex-end; gap: 6px; }
+.caption { color: var(--secondary); font-size: 12px; }
+.emoji { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; button { display: grid; place-items: center; border: 0; background: transparent; border-radius: 4px; height: 34px; cursor: pointer; font-size: 23px; &:hover, &:focus-visible { background: var(--wash); outline: 1px solid var(--line); } } }
+.date { width: 100%; box-sizing: border-box; padding: 7px 9px; color: inherit; border: 1px solid var(--line); border-radius: 4px; background: var(--paper); font: inherit; }
+.fields .error { color: #b5473b; }
+.reference { overflow-wrap: anywhere; }
+
+.dialog { max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: none; }
+.categories { display: flex; gap: 3px; border-bottom: 1px solid var(--line); padding-bottom: 6px; button { flex: 1; border: 0; border-radius: 4px; padding: 5px 0; font: inherit; cursor: pointer; color: var(--secondary); background: transparent; &[aria-pressed="true"], &:hover { color: var(--ink); background: var(--wash); } &:focus-visible { outline: 1px solid var(--ink); } } }
+.emojiPanel { max-height: min(240px, calc(100dvh - 310px)); min-height: 34px; overflow-y: auto; overscroll-behavior: none; }

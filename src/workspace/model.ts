@@ -4,6 +4,7 @@ import { documentKind, type DocumentKind } from "@/lib/documentType";
 import { rebaseSourceContent, sourceReferenceTokens } from "@/lib/sourceResources";
 import debounce from "lodash/debounce";
 import { reliability, type Draft, type DiskSnapshot, type ReliabilityGateway } from "@/lib/reliability";
+import { closeHistory } from "@tiptap/pm/history";
 import { Editor, type JSONContent } from "@tiptap/core";
 import { editorExtensions } from "@/components/DocumentEditor/extensions";
 import { files, type DirectoryEntry, type DirectoryRoot, type DocumentFile, type FileGateway } from "@/lib/files";
@@ -214,14 +215,17 @@ export class WorkspaceModel {
     return tab.authority === 'source' || !tab.editor ? tab.sourceText : packMarkdown(referenceMarkdown(tab.editor, value => tab.resourceBase && tab.path ? rebaseReference(value, tab.resourceBase, tab.path) : value), tab.envelope);
   }
 
-  async insertImages(id: string, images?: File[], paths?: string[]) {
+  async insertImages(id: string, images?: File[], paths?: string[], replace?: { from: number; to: number }) {
     const tab = this.tabs.find(item => item.id === id);
     if (tab?.mode !== "document" || !tab?.editor?.isEditable || this.busy || this.closing) return;
+    const originalEditor = tab.editor;
+    const originalRangeText = replace ? originalEditor.state.doc.textBetween(replace.from, replace.to) : null;
     if (!tab.path) {
       tab.status = "插入图片前，请先保存文档"; this.changed();
       if (!await this.save(id)) return;
     }
-    const position = tab.editor.state.selection.from;
+    if (this.disposed || !this.tabs.includes(tab) || this.activeId !== id || tab.mode !== 'document' || tab.editor !== originalEditor || originalEditor.isDestroyed) return;
+    const position = replace ?? originalEditor.state.selection.from;
     this.busy = true; this.error = ""; this.changed();
     try {
       const inputs = images?.length ? images : paths?.length ? paths : [undefined];
@@ -233,7 +237,9 @@ export class WorkspaceModel {
         const src = rebaseReference(result.reference, tab.path!, tab.resourceBase ?? tab.path!);
         content.push({ type: "image", attrs: { src, alt: result.name } });
       }
-      if (content.length && !this.disposed) { tab.editor.commands.insertContentAt(position, content); tab.status = "图片已存入文档旁的 assets/，请保存文档"; }
+      if (content.length && !this.disposed && tab.editor === originalEditor) {
+        if (replace && originalEditor.state.doc.textBetween(replace.from, replace.to) !== originalRangeText) throw new Error("插入位置已改变，请重新选择图片");
+        originalEditor.chain().focus().command(({ tr }) => { if (replace) closeHistory(tr); return true; }).insertContentAt(position, content).run(); tab.status = "图片已存入文档旁的 assets/，请保存文档"; }
     } catch (error) { this.error = String(error); }
     finally { this.busy = false; this.changed(); }
   }

@@ -1,0 +1,5 @@
+.menu { position: fixed; z-index: 90; width: min(252px, calc(100vw - 16px)); padding: 4px; overflow-y: auto; overscroll-behavior: none; background: var(--paper, #fffefa); color: var(--ink, #282824); border: 1px solid var(--line, #e4e2d9); border-radius: 5px; box-shadow: 0 5px 20px #0002; font-family: inherit; font-size: 12px; line-height: 1.45;
+  button { display: flex; gap: 9px; align-items: center; width: 100%; min-height: 29px; padding: 4px 8px; border: 0; border-radius: 3px; background: transparent; color: inherit; text-align: left; font-size: 12px; cursor: pointer; small { margin-left: auto; color: var(--muted, #96958b); font-size: 10px; } &[data-selected="true"] { background: var(--desk, #f4f3ed); outline: 1px solid var(--line, #e4e2d9); outline-offset: -1px; } }
+}
+.caption { display: flex; justify-content: space-between; gap: 12px; position: sticky; top: -4px; background: var(--paper, #fffefa); padding: 5px 8px 7px; font-size: 10px; color: var(--secondary, #77776f); span { color: var(--muted, #96958b); } }
+.empty { color: var(--muted, #96958b); font-size: 12px; padding: 4px 8px; }

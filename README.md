@@ -12,6 +12,7 @@ MIT 开源的本地 Markdown 桌面编辑器。使用 Tauri 2、React、Tiptap�
 - [实现现状与验证范围](doc/status.md)
 - [源码、文本与代码编辑](doc/source-editing.md)
 - [目录文件管理与界面中文化](doc/file-management.md)
+- [斜杠插入与 Mermaid 图形](doc/slash-menu.md)
 - [自定义背景与侧栏精简](doc/background.md)
 - [macOS 默认打开方式](doc/file-associations.md)
 - [待实现清单](doc/roadmap.md)
@@ -36,6 +37,8 @@ npm test
 当前为本地构建，未做 Developer ID 签名和公证。完整脚本、目录与验证范围见[开发与桌面打包](doc/build.md)。
 
 ## 使用
+
+- 文档段落开头输入 `/` 插入标题、列表、表格、图片、表情、日期或本地文档链接，支持关键词过滤与键盘选择。`/mermaid` 插入可编辑源码和本地图形预览，代码块支持语言选择与复制。详见[斜杠与图形说明](doc/slash-menu.md)。
 
 - 打开目录：⌘/Ctrl + Shift + O；打开文件：⌘/Ctrl + O；新建 MD：左侧加号或 ⌘/Ctrl + N（`未命名.md`，所见即所得）；新建文本：⌘/Ctrl + Shift + N（`未命名`，无后缀，源码编辑）。两类文档分别以空格加编号区分，保存时可自行决定后缀。
 - 关闭当前标签：⌘/Ctrl + W；关闭窗口：⌘/Ctrl + Shift + W；退出：⌘/Ctrl + Q。关闭窗口/退出时逐一检查未保存文档。

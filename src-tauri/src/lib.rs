@@ -246,6 +246,7 @@ pub fn run() {
             background::choose_background,
             background::set_background_options,
             background::reset_background,
+            resources::choose_markdown_reference,
             resources::load_document_image,
             resources::import_document_image,
             resources::open_document_link,
