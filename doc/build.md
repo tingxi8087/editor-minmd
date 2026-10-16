@@ -2,6 +2,19 @@
 
 更新与验证日期：2026-10-16。
 
+## 准备环境
+
+需要 Node.js 22+、Rust stable 和 [Tauri 平台前置环境](https://v2.tauri.app/start/prerequisites/)。本项目使用 Tauri 2、React、TypeScript、Tiptap、CodeMirror 6 和 Paper Ink。
+
+```sh
+git clone https://github.com/tingxi8087/editor-minmd.git
+cd editor-minmd
+npm ci
+npm run dev
+```
+
+`npm run dev` 直接启动桌面应用；本地文件读写、系统对话框及文件关联需在桌面窗口验证。浏览器预览仅用于界面调试。
+
 ## 命令
 
 | 命令 | 行为 |
@@ -63,3 +76,36 @@ npm run build -- --debug --bundles app
 - 当前没有 Developer ID 分发签名/Apple 公证；Windows/Linux 分发构建、跨架构与其他 macOS 版本尚未实机验证。Vite 仍有既有主包大小警告。
 
 源码：[桌面入口](../scripts/desktop.mjs)、[版本同步](../scripts/version.mjs)、[分发导出](../scripts/artifacts.mjs)、[测试](../tests/build-scripts.test.ts)。
+
+
+## 测试与发布
+
+```sh
+npm test
+cargo test --manifest-path src-tauri/Cargo.toml
+npm run build
+```
+
+桌面应用直接在本机运行，无需部署服务器。`dist/` 的网页构建不包含原生文件能力，不等同于完整桌面应用。
+
+发布前检查版本、测试结果、实际桌面行为、ZIP 完整性与 DMG 校验。将当前源码提交并推送后，以 `v<package.json.version>` 创建 GitHub Release，上传对应平台的 DMG、应用 ZIP、`build-info.json` 与 SHA-256 清单；生成物留在 `build/`，不进入 Git 历史。发布说明需写明支持的平台、架构及签名/公证状态，不将未验证的平台标为可用。
+
+## v0.1.0 发布核验（2026-10-16）
+
+本次发布前重新运行前端 23 个文件 / 325 项测试、Rust 44 项测试，均通过。完整 release 桌面构建通过；导出应用版本为 `0.1.0`、可执行文件为 ARM64，DMG 校验和 ZIP 完整性检查通过。生成 SHA-256 清单随 Release 附件发布。本版仅分发 macOS Apple Silicon，未做 Developer ID 签名与公证。
+
+README 的三张截图来自隔离 macOS 桌面 QA 应用，内容为仓库公开示例 `examples/纸墨试写.md`，分别展示文档、大纲、源码和深色阅读。截图保留系统录屏指示标记。
+
+## 源码导航
+
+| 位置 | 职责 |
+| --- | --- |
+| `src/App.tsx` | 工作台布局、模式、快捷键与交互入口 |
+| `src/components/DocumentEditor/` | Tiptap 文档编辑、Markdown 语法与排版 |
+| `src/components/SourceEditor/`、`SourceToolbar/` | CodeMirror 会话、高亮与源码工具栏 |
+| `src/components/FileTree/`、`DocumentTabs/` | 文件导航与标签 |
+| `src/workspace/model.ts` | 多标签会话、文件操作、关闭队列与目录状态 |
+| `src/lib/`、`src/store/` | 原生调用、文件封装与本地设置 |
+| `src-tauri/src/` | 原生文件、目录、菜单、系统关联与保存保护 |
+
+项目使用 `@/*` 别名、Less/CSS Modules、Paper Ink 组件及其图标；当前只有一个工作台页面。
