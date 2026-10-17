@@ -1,6 +1,6 @@
 [package]
 name = "editor-minmd"
-version = "0.1.0"
+version = "0.1.1"
 description = "A local Markdown editor in paper and ink"
 authors = ["tingxi8087"]
 license = "MIT"

@@ -59,4 +59,4 @@ HTML 经过 DOMPurify 过滤，脚本、事件、iframe、表单、任意样式�
 
 磁盘验收使用 `artifacts/reading-native/` 独立副本：BOM + Frontmatter + CRLF + 末尾空行的文档在阅读、无修改保存及反复切换后 SHA-256 不变；追加一行源码后，从阅读模式保存，结果与“原始全部字节 + CRLF + 追加文本”完全相同。正常退出重启后保留阅读偏好和保存内容。关联的示例文档与行内示例未被修改。验收结束移除副本标签并退出 QA，生产数据与系统文件关联未变动。
 
-阅读查找截图留在本地 `artifacts/reading-native-search.jpg`；测试/构建日志为 `artifacts/reading-*.log`。本轮没有更新公开 Release。
+阅读查找截图留在本地 `artifacts/reading-native-search.jpg`；测试/构建日志为 `artifacts/reading-*.log`。扩展阅读随 [v0.1.1](releases/0.1.1.md) 分发。

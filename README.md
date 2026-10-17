@@ -6,6 +6,8 @@
 
 [下载最新版](https://github.com/tingxi8087/editor-minmd/releases/latest) · [开发与打包](doc/build.md) · [功能进展](doc/status.md) · [后续计划](doc/roadmap.md)
 
+**当前版本：[v0.1.1](https://github.com/tingxi8087/editor-minmd/releases/tag/v0.1.1)** · 独立阅读支持脚注、公式、提示块、双链嵌入和安全 HTML，修复语法误判并加强原文保护。[查看更新说明](doc/releases/0.1.1.md)。
+
 ![文档编辑与标题大纲](doc/screenshots/document.jpg)
 
 ## 下载与开始使用

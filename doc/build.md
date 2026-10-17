@@ -1,6 +1,6 @@
 # 开发与桌面打包
 
-更新与验证日期：2026-10-16。
+更新与验证日期：2026-10-17。
 
 ## 准备环境
 
@@ -45,11 +45,11 @@ Tauri 的 `beforeDevCommand`、`beforeBuildCommand` 分别调用 `dev:web`、`bu
 
 ```text
 build/
-└── 0.1.0/
+└── 0.1.1/
     └── aarch64-apple-darwin/
         ├── editor-minmd.app
-        ├── editor-minmd_0.1.0_aarch64.dmg
-        ├── editor-minmd_0.1.0_aarch64-apple-darwin.zip
+        ├── editor-minmd_0.1.1_aarch64.dmg
+        ├── editor-minmd_0.1.1_aarch64-apple-darwin.zip
         └── build-info.json
 ```
 
@@ -67,7 +67,7 @@ npm run build -- --debug --bundles app
 
 导出到 `build/<版本>/<目标>-debug/`，与 release 隔离。可将 `--target <Rust triple>` 等 Tauri 构建参数传入；跨架构/跨平台仍需要对应工具链，不代表在 macOS 上自动生成 Windows/Linux 安装包。`--no-bundle` 不适用于分发入口，只检查网页使用 `build:web`。
 
-## 验证
+## 早期命令与构建验收（历史记录）
 
 - `npm test`：11 个文件、160 项通过。新增 6 项脚本测试覆盖版本变化与重复同步、依赖版本不变、非法版本拒绝、分发导出与清单、符号链接/执行权限、失败保留旧产物、不同版本/debug 隔离，以及前端/桌面钩子不递归。
 - `npm run dev`：实际执行 `dev:web`，Vite 1537 服务与 `target/debug/editor-minmd` 桌面进程启动；测试后停止开发进程。开发二进制无 `.app` 包，计算机 UI 工具无法按应用包定位它，未将进程检查当作窗口视觉验收。
@@ -95,6 +95,10 @@ npm run build
 本次发布前重新运行前端 23 个文件 / 325 项测试、Rust 44 项测试，均通过。完整 release 桌面构建通过；导出应用版本为 `0.1.0`、可执行文件为 ARM64，DMG 校验和 ZIP 完整性检查通过。生成 SHA-256 清单随 Release 附件发布。本版仅分发 macOS Apple Silicon，未做 Developer ID 签名与公证。
 
 README 的三张截图来自隔离 macOS 桌面 QA 应用，内容为仓库公开示例 `examples/纸墨试写.md`，分别展示文档、大纲、源码和深色阅读。截图保留系统录屏指示标记。
+
+## v0.1.1 发布核验（2026-10-17）
+
+版本统一从 `package.json.version = 0.1.1` 同步到 npm/Cargo 锁文件及 Cargo 包元数据，Tauri 继续读取根 package.json。发布前重新运行前端 24 个文件 / 349 项测试与 Rust 46 项测试，完整 release 构建通过。分发目录为 `build/0.1.1/aarch64-apple-darwin/`，包含 ARM64 应用、DMG、ZIP、构建清单与 SHA-256 校验清单；应用两个版本字段、归档完整性与远端附件摘要均在发布时核对。功能与平台范围见 [v0.1.1 更新说明](releases/0.1.1.md)。
 
 ## 源码导航
 
